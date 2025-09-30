@@ -41,7 +41,7 @@ export default function PipelineKanban({ pipelineId }) {
         order: 0,
         evaluations: [
           {
-            id: 'eval_1',
+            id: 'evaluation_1',
             courseId: 'course_1',
             courseName: 'Introduction to Psychology',
             instructor: 'Dr. Sarah Johnson',
@@ -53,7 +53,7 @@ export default function PipelineKanban({ pipelineId }) {
             lastUpdated: '2024-01-10T10:30:00Z'
           },
           {
-            id: 'eval_2',
+            id: 'evaluation_2',
             courseId: 'course_2',
             courseName: 'Advanced Mathematics',
             instructor: 'Prof. Michael Chen',
@@ -73,7 +73,7 @@ export default function PipelineKanban({ pipelineId }) {
         order: 1,
         evaluations: [
           {
-            id: 'eval_3',
+            id: 'evaluation_3',
             courseId: 'course_3',
             courseName: 'Digital Marketing',
             instructor: 'Dr. Emily Rodriguez',
@@ -93,7 +93,7 @@ export default function PipelineKanban({ pipelineId }) {
         order: 2,
         evaluations: [
           {
-            id: 'eval_4',
+            id: 'evaluation_4',
             courseId: 'course_4',
             courseName: 'Software Engineering',
             instructor: 'Dr. James Wilson',
@@ -105,7 +105,7 @@ export default function PipelineKanban({ pipelineId }) {
             lastUpdated: '2024-01-15T16:45:00Z'
           },
           {
-            id: 'eval_5',
+            id: 'evaluation_5',
             courseId: 'course_5',
             courseName: 'Data Science Fundamentals',
             instructor: 'Prof. Lisa Anderson',
@@ -125,7 +125,7 @@ export default function PipelineKanban({ pipelineId }) {
         order: 3,
         evaluations: [
           {
-            id: 'eval_6',
+            id: 'evaluation_6',
             courseId: 'course_6',
             courseName: 'Business Analytics',
             instructor: 'Dr. Robert Taylor',
@@ -145,7 +145,7 @@ export default function PipelineKanban({ pipelineId }) {
         order: 4,
         evaluations: [
           {
-            id: 'eval_7',
+            id: 'evaluation_7',
             courseId: 'course_7',
             courseName: 'Web Development',
             instructor: 'Dr. Maria Garcia',
@@ -201,11 +201,11 @@ export default function PipelineKanban({ pipelineId }) {
       
       if (!activeStage || !overStage) return prev
 
-      const activeEvaluation = activeStage.evaluations.find(eval => eval.id === activeId)
+      const activeEvaluation = activeStage.evaluations.find(evaluation => evaluation.id === activeId)
       if (!activeEvaluation) return prev
 
       // Remove from active stage
-      const newActiveEvaluations = activeStage.evaluations.filter(eval => eval.id !== activeId)
+      const newActiveEvaluations = activeStage.evaluations.filter(evaluation => evaluation.id !== activeId)
       
       // Add to over stage
       const updatedEvaluation = {
@@ -258,8 +258,8 @@ export default function PipelineKanban({ pipelineId }) {
         const stage = prev.stages.find(s => s.id === activeContainer)
         if (!stage) return prev
 
-        const oldIndex = stage.evaluations.findIndex(eval => eval.id === activeId)
-        const newIndex = stage.evaluations.findIndex(eval => eval.id === overId)
+        const oldIndex = stage.evaluations.findIndex(evaluation => evaluation.id === activeId)
+        const newIndex = stage.evaluations.findIndex(evaluation => evaluation.id === overId)
 
         if (oldIndex !== newIndex) {
           const newEvaluations = arrayMove(stage.evaluations, oldIndex, newIndex)
@@ -296,13 +296,13 @@ export default function PipelineKanban({ pipelineId }) {
     
     // Find which stage contains this evaluation
     return pipeline.stages.find(stage => 
-      stage.evaluations.some(eval => eval.id === id)
+      stage.evaluations.some(evaluation => evaluation.id === id)
     )?.id
   }, [pipeline.stages])
 
   const findEvaluationById = useCallback((id) => {
     for (const stage of pipeline.stages) {
-      const evaluation = stage.evaluations.find(eval => eval.id === id)
+      const evaluation = stage.evaluations.find(evaluation => evaluation.id === id)
       if (evaluation) return evaluation
     }
     return null
@@ -310,7 +310,7 @@ export default function PipelineKanban({ pipelineId }) {
 
   const addNewEvaluation = useCallback((stageId) => {
     const newEvaluation = {
-      id: `eval_${Date.now()}`,
+      id: `evaluation_${Date.now()}`,
       courseId: `course_${Date.now()}`,
       courseName: 'New Course Evaluation',
       instructor: 'Instructor Name',
@@ -339,10 +339,10 @@ export default function PipelineKanban({ pipelineId }) {
       ...prev,
       stages: prev.stages.map(stage => ({
         ...stage,
-        evaluations: stage.evaluations.map(eval => 
-          eval.id === evaluationId 
-            ? { ...eval, ...updates, lastUpdated: new Date().toISOString() }
-            : eval
+        evaluations: stage.evaluations.map(evaluation => 
+          evaluation.id === evaluationId 
+            ? { ...evaluation, ...updates, lastUpdated: new Date().toISOString() }
+            : evaluation
         )
       }))
     }))
@@ -353,7 +353,7 @@ export default function PipelineKanban({ pipelineId }) {
       ...prev,
       stages: prev.stages.map(stage => ({
         ...stage,
-        evaluations: stage.evaluations.filter(eval => eval.id !== evaluationId)
+        evaluations: stage.evaluations.filter(evaluation => evaluation.id !== evaluationId)
       }))
     }))
     
@@ -435,15 +435,15 @@ export default function PipelineKanban({ pipelineId }) {
 
   function getTotalEvaluations(status) {
     return pipeline.stages.reduce((total, stage) => 
-      total + stage.evaluations.filter(eval => eval.status === status).length, 0
+      total + stage.evaluations.filter(evaluation => evaluation.status === status).length, 0
     )
   }
 
   function getOverdueCount() {
     const today = new Date().toISOString().split('T')[0]
     return pipeline.stages.reduce((total, stage) => 
-      total + stage.evaluations.filter(eval => 
-        eval.status === 'active' && eval.dueDate < today
+      total + stage.evaluations.filter(evaluation => 
+        evaluation.status === 'active' && evaluation.dueDate < today
       ).length, 0
     )
   }

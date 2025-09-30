@@ -46,7 +46,7 @@ export default function KanbanColumn({
         className="min-h-[200px] space-y-3"
       >
         <SortableContext 
-          items={evaluations.map(eval => eval.id)}
+          items={evaluations.map(evaluation => evaluation.id)}
           strategy={verticalListSortingStrategy}
         >
           {evaluations.map((evaluation) => (
