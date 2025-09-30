@@ -19,7 +19,8 @@ import {
   Users,
   Building2,
   CreditCard,
-  Mail
+  Mail,
+  Layers
 } from 'lucide-react'
 
 export default function DashboardLayout({ children, title = 'Dashboard' }) {
@@ -32,6 +33,7 @@ export default function DashboardLayout({ children, title = 'Dashboard' }) {
     { name: 'Dashboard', href: '/dashboard', icon: Home, current: router.pathname === '/dashboard' },
     { name: 'Courses', href: '/dashboard/courses', icon: BookOpen, current: router.pathname.startsWith('/dashboard/courses') },
     { name: 'Surveys', href: '/dashboard/feedback-forms', icon: FileText, current: router.pathname.startsWith('/dashboard/feedback-forms') },
+    { name: 'Pipeline', href: '/dashboard/pipelines', icon: Layers, current: router.pathname.startsWith('/dashboard/pipelines') },
     { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3, current: router.pathname.startsWith('/dashboard/analytics') },
   ]
 

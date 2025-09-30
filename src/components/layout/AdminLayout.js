@@ -47,6 +47,7 @@ export default function AdminLayout({ children, title = 'Admin Dashboard' }) {
   const platformNavigation = [
     { name: 'Dashboard', href: '/admin/platform/dashboard', icon: Home, current: router.pathname === '/admin/platform/dashboard' },
     { name: 'Organizations', href: '/admin/platform/organizations', icon: Users, current: router.pathname.startsWith('/admin/platform/organizations') },
+    { name: 'Pipelines', href: '/admin/platform/pipelines', icon: Layers, current: router.pathname.startsWith('/admin/platform/pipelines') },
     { name: 'System Analytics', href: '/admin/platform/analytics', icon: BarChart3, current: router.pathname.startsWith('/admin/platform/analytics') },
     { name: 'User Management', href: '/admin/platform/users', icon: User, current: router.pathname.startsWith('/admin/platform/users') },
     { name: 'Data Management', href: '/admin/platform/data-management', icon: Database, current: router.pathname.startsWith('/admin/platform/data-management') },
@@ -59,6 +60,7 @@ export default function AdminLayout({ children, title = 'Admin Dashboard' }) {
     { name: 'Dashboard', href: '/admin/organization/dashboard', icon: Home, current: router.pathname === '/admin/organization/dashboard' },
     { name: 'Users', href: '/admin/organization/users', icon: Users, current: router.pathname.startsWith('/admin/organization/users') },
     { name: 'Departments', href: '/admin/organization/departments', icon: Layers, current: router.pathname.startsWith('/admin/organization/departments') },
+    { name: 'Pipelines', href: '/admin/organization/pipelines', icon: Activity, current: router.pathname.startsWith('/admin/organization/pipelines') },
     { name: 'Analytics', href: '/admin/organization/analytics', icon: BarChart3, current: router.pathname.startsWith('/admin/organization/analytics') },
     { name: 'Billing', href: '/admin/organization/billing', icon: CreditCard, current: router.pathname.startsWith('/admin/organization/billing') },
     { name: 'Notifications', href: '/admin/organization/notifications', icon: Mail, current: router.pathname.startsWith('/admin/organization/notifications') },
