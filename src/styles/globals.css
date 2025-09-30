@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Poppins', sans-serif;
+  }
+}
+
+@layer utilities {
+  .text-darken {
+    color: #2F327D;
+  }
+  
+  .bg-cream {
+    background-color: #FFF2E1;
+  }
+  
+  .floating {
+    animation: floating 3s ease-in-out infinite;
+  }
+  
+  .floating-4 {
+    animation: floating-4 4s ease-in-out infinite;
+  }
+}
+
+@keyframes floating {
+  0% { transform: translate(0, 0px); }
+  50% { transform: translate(0, 8px); }
+  100% { transform: translate(0, -0px); }
+}
+
+@keyframes floating-4 {
+  0% { transform: translate(0, 0px); }
+  50% { transform: translate(0, 8px); }
+  100% { transform: translate(0, -0px); }
+}
