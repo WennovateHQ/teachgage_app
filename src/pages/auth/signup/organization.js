@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Link from 'next/link'
+import Image from 'next/image'
 import { 
   Building2,
   User,
@@ -144,6 +145,15 @@ export default function OrganizationSignupPage() {
       <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
+            <div className="flex justify-center mb-6">
+              <Image
+                src="/teachgage-blue-logo.png"
+                alt="TeachGage Logo"
+                width={200}
+                height={60}
+                className="h-12 w-auto"
+              />
+            </div>
             <Building2 className="mx-auto h-12 w-12 text-teachgage-blue" />
             <h1 className="mt-4 text-3xl font-extrabold text-teachgage-blue">
               Create Organization Account

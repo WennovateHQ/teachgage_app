@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { Eye, EyeOff, User, Mail, Lock, CreditCard, Building, GraduationCap } from 'lucide-react';
 
@@ -159,6 +160,15 @@ export default function SignupForm() {
     <div className="min-h-screen bg-white py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/teachgage-blue-logo.png"
+              alt="TeachGage Logo"
+              width={200}
+              height={60}
+              className="h-12 w-auto"
+            />
+          </div>
           <h2 className="text-3xl font-bold text-teachgage-blue">Create Your TeachGage Account</h2>
           <p className="mt-2 text-teachgage-navy">Choose the plan that fits your needs</p>
         </div>

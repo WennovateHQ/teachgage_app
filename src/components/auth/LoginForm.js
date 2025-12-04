@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react';
 
@@ -133,6 +134,15 @@ export default function LoginForm() {
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/teachgage-blue-logo.png"
+              alt="TeachGage Logo"
+              width={200}
+              height={60}
+              className="h-12 w-auto"
+            />
+          </div>
           <h2 className="text-3xl font-bold text-teachgage-blue">Welcome Back</h2>
           <p className="mt-2 text-teachgage-navy">Sign in to your TeachGage account</p>
         </div>

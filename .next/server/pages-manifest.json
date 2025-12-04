@@ -2,9 +2,10 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/": "pages/index.js",
-  "/api/auth/[...nextauth]": "pages/api/auth/[...nextauth].js",
   "/auth/signin": "pages/auth/signin.js",
+  "/": "pages/index.js",
+  "/auth/signup": "pages/auth/signup.js",
+  "/api/auth/[...nextauth]": "pages/api/auth/[...nextauth].js",
   "/dashboard": "pages/dashboard.js",
-  "/dashboard/pipelines": "pages/dashboard/pipelines.js"
+  "/api/auth/login": "pages/api/auth/login.js"
 }

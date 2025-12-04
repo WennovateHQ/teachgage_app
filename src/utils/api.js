@@ -1,107 +1,30 @@
 import axios from 'axios'
 
-// Demo data
-const demoData = {
-  courses: [
-    {
-      id: '1',
-      title: 'Introduction to Photography',
-      description: 'Learn the basics of photography including composition, lighting, and camera settings.',
-      status: 'active',
-      studentCount: 24,
-      createdAt: '2024-01-15T10:00:00Z',
-      updatedAt: '2024-01-20T14:30:00Z',
-      instructor: 'Demo Teacher',
-      duration: '8 weeks',
-      category: 'Arts'
-    },
-    {
-      id: '2',
-      title: 'Advanced Digital Marketing',
-      description: 'Master digital marketing strategies including SEO, social media, and content marketing.',
-      status: 'active',
-      studentCount: 18,
-      createdAt: '2024-02-01T09:00:00Z',
-      updatedAt: '2024-02-05T16:45:00Z',
-      instructor: 'Demo Teacher',
-      duration: '12 weeks',
-      category: 'Business'
-    },
-    {
-      id: '3',
-      title: 'Web Development Fundamentals',
-      description: 'Build modern websites using HTML, CSS, JavaScript, and React.',
-      status: 'draft',
-      studentCount: 0,
-      createdAt: '2024-02-10T11:00:00Z',
-      updatedAt: '2024-02-10T11:00:00Z',
-      instructor: 'Demo Teacher',
-      duration: '16 weeks',
-      category: 'Technology'
-    }
-  ],
-  feedbackForms: [
-    {
-      id: '1',
-      title: 'Mid-Course Photography Feedback',
-      description: 'Collect feedback on photography course progress and teaching methods.',
-      courseId: '1',
-      courseName: 'Introduction to Photography',
-      status: 'active',
-      responseCount: 18,
-      createdAt: '2024-01-25T10:00:00Z',
-      questions: [
-        { id: '1', type: 'rating', question: 'How would you rate the course content?', required: true },
-        { id: '2', type: 'text', question: 'What aspects of the course do you find most valuable?', required: false },
-        { id: '3', type: 'rating', question: 'How clear are the instructor\'s explanations?', required: true }
-      ]
-    },
-    {
-      id: '2',
-      title: 'Digital Marketing Course Evaluation',
-      description: 'End-of-course evaluation for digital marketing students.',
-      courseId: '2',
-      courseName: 'Advanced Digital Marketing',
-      status: 'active',
-      responseCount: 12,
-      createdAt: '2024-02-15T14:00:00Z',
-      questions: [
-        { id: '1', type: 'rating', question: 'Overall course satisfaction', required: true },
-        { id: '2', type: 'multiple-choice', question: 'Which topic was most useful?', options: ['SEO', 'Social Media', 'Content Marketing', 'Analytics'], required: true },
-        { id: '3', type: 'text', question: 'Suggestions for improvement', required: false }
-      ]
-    }
-  ],
-  analytics: {
-    dashboardStats: {
-      totalCourses: 8,
-      activeForms: 12,
-      totalResponses: 247,
-      averageRating: 4.6
-    },
-    responseTrends: [
-      { date: '2024-01-01', responses: 15 },
-      { date: '2024-01-02', responses: 23 },
-      { date: '2024-01-03', responses: 18 },
-      { date: '2024-01-04', responses: 31 },
-      { date: '2024-01-05', responses: 27 }
-    ]
-  }
-}
+/**
+ * Production API Configuration
+ * Direct connection to backend API
+ * 
+ * IMPORTANT: All demo data has been removed for production.
+ * This file now makes direct calls to the backend API.
+ */
 
-// Check if user is demo user (always return true for demo mode)
-const isDemoUser = async () => {
-  // For now, always return true to use demo data
-  // In production, this would check if the user has a demo account
-  return true
+// Get API URL - use NEXT_PUBLIC_API_URL for client-side, fallback to localhost for development
+const getApiUrl = () => {
+  // Client-side: Use NEXT_PUBLIC_API_URL
+  if (typeof window !== 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+  }
+  // Server-side: Use BACKEND_URL
+  return process.env.BACKEND_URL || 'http://localhost:5000'
 }
 
 // Create axios instance
 const api = axios.create({
-  baseURL: process.env.BACKEND_URL || 'http://localhost:5000',
+  baseURL: getApiUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30 second timeout
 })
 
 // Request interceptor to add auth token
@@ -118,14 +41,59 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor for error handling
+// Response interceptor for error handling and token refresh
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized access
-      window.location.href = '/auth/signin'
+  async (error) => {
+    const originalRequest = error.config
+
+    // Handle 401 Unauthorized
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
+
+      try {
+        // Attempt to refresh token
+        const refreshToken = localStorage.getItem('teachgage_refresh_token')
+        if (refreshToken) {
+          const response = await axios.post(`${getApiUrl()}/api/auth/refresh`, {
+            refreshToken
+          })
+
+          const { token, refreshToken: newRefreshToken } = response.data.data
+          
+          // Update tokens
+          localStorage.setItem('teachgage_token', token)
+          if (newRefreshToken) {
+            localStorage.setItem('teachgage_refresh_token', newRefreshToken)
+          }
+
+          // Retry original request with new token
+          originalRequest.headers.Authorization = `Bearer ${token}`
+          return api(originalRequest)
+        }
+      } catch (refreshError) {
+        // Refresh failed, redirect to login
+        localStorage.removeItem('teachgage_token')
+        localStorage.removeItem('teachgage_refresh_token')
+        localStorage.removeItem('teachgage_user')
+        window.location.href = '/auth/signin'
+        return Promise.reject(refreshError)
+      }
     }
+
+    // Handle other errors
+    if (error.response?.status === 403) {
+      console.error('Permission denied:', error.response.data?.message)
+    }
+
+    if (error.response?.status === 500) {
+      console.error('Server error:', error.response.data?.message)
+    }
+
+    if (!error.response) {
+      console.error('Network error: Unable to connect to server')
+    }
+
     return Promise.reject(error)
   }
 )
@@ -177,44 +145,8 @@ export const userAPI = {
 }
 
 export const courseAPI = {
-  getCourses: async (params) => {
-    if (await isDemoUser()) {
-      // Return demo courses data
-      let courses = [...demoData.courses]
-      
-      // Apply filters if provided
-      if (params?.search) {
-        courses = courses.filter(course => 
-          course.title.toLowerCase().includes(params.search.toLowerCase()) ||
-          course.description.toLowerCase().includes(params.search.toLowerCase())
-        )
-      }
-      
-      if (params?.status && params.status !== 'all') {
-        courses = courses.filter(course => course.status === params.status)
-      }
-      
-      return { 
-        data: {
-          courses,
-          pagination: {
-            page: params?.page || 1,
-            limit: params?.limit || 10,
-            total: courses.length,
-            totalPages: Math.ceil(courses.length / (params?.limit || 10))
-          }
-        }
-      }
-    }
-    return api.get('/api/courses', { params })
-  },
-  getCourse: async (id) => {
-    if (await isDemoUser()) {
-      const course = demoData.courses.find(c => c.id === id)
-      return { data: course }
-    }
-    return api.get(`/api/courses/${id}`)
-  },
+  getCourses: (params) => api.get('/api/courses', { params }),
+  getCourse: (id) => api.get(`/api/courses/${id}`),
   createCourse: (data) => api.post('/api/courses', {
     title: data.title,
     description: data.description,
@@ -255,33 +187,8 @@ export const courseAPI = {
 }
 
 export const feedbackAPI = {
-  getForms: async (params) => {
-    if (await isDemoUser()) {
-      let forms = [...demoData.feedbackForms]
-      
-      // Apply filters if provided
-      if (params?.search) {
-        forms = forms.filter(form => 
-          form.title.toLowerCase().includes(params.search.toLowerCase()) ||
-          form.description.toLowerCase().includes(params.search.toLowerCase())
-        )
-      }
-      
-      if (params?.status && params.status !== 'all') {
-        forms = forms.filter(form => form.status === params.status)
-      }
-      
-      return { data: forms }
-    }
-    return api.get('/api/feedback-forms', { params })
-  },
-  getForm: async (id) => {
-    if (await isDemoUser()) {
-      const form = demoData.feedbackForms.find(f => f.id === id)
-      return { data: form }
-    }
-    return api.get(`/api/feedback-forms/${id}`)
-  },
+  getForms: (params) => api.get('/api/feedback-forms', { params }),
+  getForm: (id) => api.get(`/api/feedback-forms/${id}`),
   createForm: (data) => api.post('/api/feedback-forms', data),
   updateForm: (id, data) => api.put(`/api/feedback-forms/${id}`, data),
   deleteForm: (id) => api.delete(`/api/feedback-forms/${id}`),
@@ -336,49 +243,10 @@ export const surveyAPI = {
 }
 
 export const analyticsAPI = {
-  getDashboardStats: async () => {
-    if (await isDemoUser()) {
-      return { data: demoData.analytics.dashboardStats }
-    }
-    return api.get('/api/analytics/dashboard')
-  },
-  getCourseAnalytics: async (courseId, params) => {
-    if (await isDemoUser()) {
-      // Return demo analytics for the specific course
-      return { 
-        data: {
-          courseId,
-          totalStudents: 24,
-          averageRating: 4.5,
-          completionRate: 85,
-          feedbackCount: 18,
-          trends: demoData.analytics.responseTrends
-        }
-      }
-    }
-    return api.get(`/api/analytics/courses/${courseId}`, { params })
-  },
-  getFormAnalytics: async (formId, params) => {
-    if (await isDemoUser()) {
-      const form = demoData.feedbackForms.find(f => f.id === formId)
-      return { 
-        data: {
-          formId,
-          responseCount: form?.responseCount || 0,
-          averageRating: 4.3,
-          completionRate: 92,
-          trends: demoData.analytics.responseTrends
-        }
-      }
-    }
-    return api.get(`/api/analytics/forms/${formId}`, { params })
-  },
-  getResponseTrends: async (params) => {
-    if (await isDemoUser()) {
-      return { data: demoData.analytics.responseTrends }
-    }
-    return api.get('/api/analytics/trends', { params })
-  },
+  getDashboardStats: () => api.get('/api/analytics/dashboard'),
+  getCourseAnalytics: (courseId, params) => api.get(`/api/analytics/courses/${courseId}`, { params }),
+  getFormAnalytics: (formId, params) => api.get(`/api/analytics/forms/${formId}`, { params }),
+  getResponseTrends: (params) => api.get('/api/analytics/trends', { params }),
   exportData: (type, params) => api.get(`/api/analytics/export/${type}`, { 
     params, 
     responseType: 'blob' 

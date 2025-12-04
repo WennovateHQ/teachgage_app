@@ -189,42 +189,30 @@ export function AuthProvider({ children }) {
 
     return null;
   };
-
   // Login function
   const login = async (email, password) => {
     dispatch({ type: AUTH_ACTIONS.LOGIN_START });
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-      // Demo authentication logic
-      const allUsers = [
-        ...demoUsers.basicInstructors,
-        ...demoUsers.professionalInstructors,
-        ...demoUsers.organizationAdmins,
-        ...demoUsers.organizationInstructors
-      ];
+      const data = await response.json();
 
-      const user = allUsers.find(u => u.email === email);
-
-      if (!user) {
-        throw new Error('Invalid email or password');
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
       }
 
-      // Demo password check (in production, this would be handled by the backend)
-      const demoPassword = 'password123'; // All demo users use this password
-      if (password !== demoPassword) {
-        throw new Error('Invalid email or password');
+      if (!data.success) {
+        throw new Error(data.message || 'Login failed');
       }
 
-      // Generate demo tokens
-      const token = `demo_token_${user.id}_${Date.now()}`;
-      const refreshToken = `demo_refresh_${user.id}_${Date.now()}`;
-
-      // Get trial status
-      const trialStatus = getTrialStatus(user);
-      const mustChangePassword = user.mustChangePassword || user.status === 'pending_password_change';
+      const { user, token, refreshToken, trialStatus, mustChangePassword } = data.data;
 
       // Store in localStorage
       localStorage.setItem('teachgage_token', token);
@@ -248,7 +236,7 @@ export function AuthProvider({ children }) {
         type: AUTH_ACTIONS.LOGIN_FAILURE,
         payload: { error: error.message }
       });
-      return { success: false, error: error.message };
+      throw error;
     }
   };
 
@@ -257,75 +245,35 @@ export function AuthProvider({ children }) {
     dispatch({ type: AUTH_ACTIONS.REGISTER_START });
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
 
-      // Demo registration logic
-      const { firstName, lastName, email, password, accountTier, organizationName, organizationType } = userData;
+      const data = await response.json();
 
-      // Check if email already exists
-      const allUsers = [
-        ...demoUsers.basicInstructors,
-        ...demoUsers.professionalInstructors,
-        ...demoUsers.organizationAdmins,
-        ...demoUsers.organizationInstructors
-      ];
-
-      if (allUsers.find(u => u.email === email)) {
-        throw new Error('Email already exists');
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
       }
 
-      // Create new user object
-      const newUser = {
-        id: `demo_${accountTier}_${Date.now()}`,
-        email,
-        firstName,
-        lastName,
-        role: accountTier === 'organizational' ? 'organization_admin' : 'instructor',
-        accountTier,
-        status: 'active',
-        emailVerified: true, // Auto-verified for demo
-        createdAt: new Date().toISOString(),
-        lastLogin: null,
-        profilePhoto: null
-      };
-
-      // Add trial information for paid accounts
-      if (accountTier === 'professional' || accountTier === 'organizational') {
-        const trialStart = new Date();
-        const trialEnd = new Date();
-        trialEnd.setDate(trialEnd.getDate() + 30);
-
-        newUser.trialStartDate = trialStart.toISOString();
-        newUser.trialEndDate = trialEnd.toISOString();
-        newUser.isTrialActive = true;
-        newUser.daysRemaining = 30;
-        newUser.hasSubscription = false;
+      if (!data.success) {
+        throw new Error(data.message || 'Registration failed');
       }
 
-      // Add organization info for organizational accounts
-      if (accountTier === 'organizational') {
-        newUser.organizationId = `org_${Date.now()}`;
-        newUser.organizationName = organizationName;
-        newUser.organizationType = organizationType;
-      }
-
-      // Generate demo tokens
-      const token = `demo_token_${newUser.id}_${Date.now()}`;
-      const refreshToken = `demo_refresh_${newUser.id}_${Date.now()}`;
-
-      // Get trial status
-      const trialStatus = getTrialStatus(newUser);
+      const { user, token, refreshToken, trialStatus } = data.data;
 
       // Store in localStorage
       localStorage.setItem('teachgage_token', token);
       localStorage.setItem('teachgage_refresh_token', refreshToken);
-      localStorage.setItem('teachgage_user_id', newUser.id);
+      localStorage.setItem('teachgage_user_id', user.id);
 
       dispatch({
         type: AUTH_ACTIONS.REGISTER_SUCCESS,
         payload: {
-          user: newUser,
+          user,
           token,
           refreshToken,
           trialStatus,
@@ -333,7 +281,7 @@ export function AuthProvider({ children }) {
         }
       });
 
-      return { success: true, user: newUser, trialStatus };
+      return { success: true, user, trialStatus };
     } catch (error) {
       dispatch({
         type: AUTH_ACTIONS.REGISTER_FAILURE,
