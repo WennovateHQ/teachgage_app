@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import DashboardLayout from '../../../components/layout/DashboardLayout'
 import { useAuth } from '../../../contexts/AuthContext'
+import { userAPI, authAPI } from '../../../utils/api'
 import { 
   User, 
   Mail, 
@@ -73,11 +74,16 @@ export default function SettingsPage() {
     setMessage({ type: '', text: '' })
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await userAPI.updateProfile(user?.id || user?.userId, {
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        email: profileData.email,
+        phone: profileData.phone,
+        title: profileData.title
+      })
       setMessage({ type: 'success', text: 'Profile updated successfully!' })
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' })
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to update profile. Please try again.' })
     } finally {
       setIsSaving(false)
     }
@@ -101,12 +107,14 @@ export default function SettingsPage() {
     }
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await authAPI.resetPassword({
+        currentPassword: passwordData.currentPassword,
+        password: passwordData.newPassword
+      })
       setMessage({ type: 'success', text: 'Password updated successfully!' })
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update password. Please try again.' })
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to update password. Please try again.' })
     } finally {
       setIsSaving(false)
     }
@@ -118,11 +126,12 @@ export default function SettingsPage() {
     setMessage({ type: '', text: '' })
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await userAPI.updateProfile(user?.id || user?.userId, {
+        notificationPreferences: notifications
+      })
       setMessage({ type: 'success', text: 'Notification preferences updated!' })
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update preferences. Please try again.' })
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to update preferences. Please try again.' })
     } finally {
       setIsSaving(false)
     }

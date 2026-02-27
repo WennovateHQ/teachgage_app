@@ -4,11 +4,7 @@ import Head from 'next/head'
 import DashboardLayout from '../../../components/layout/DashboardLayout'
 import Breadcrumb from '../../../components/common/Breadcrumb'
 import { useAuth } from '../../../contexts/AuthContext'
-import { 
-  demoUsers, 
-  demoDepartments,
-  demoOrganizations 
-} from '../../../data/demoData'
+import { organizationAPI, departmentAPI, userAPI } from '../../../utils/api'
 import { 
   Users, 
   Search, 
@@ -53,23 +49,26 @@ export default function OrganizationUsersPage() {
     }
   }, [user, isAuthenticated, isLoading, router])
 
-  const loadOrganizationData = () => {
+  const loadOrganizationData = async () => {
     try {
-      // Get organization details
-      const orgData = demoOrganizations.find(org => org.id === user.organizationId)
-      setOrganization(orgData)
+      const [orgRes, usersRes, deptsRes] = await Promise.allSettled([
+        organizationAPI.getOrganization(user.organizationId),
+        userAPI.getUsers({ organizationId: user.organizationId }),
+        departmentAPI.getDepartments({ organizationId: user.organizationId }),
+      ]);
 
-      // Get organization instructors
-      const orgInstructors = demoUsers.organizationInstructors.filter(
-        instructor => instructor.organizationId === user.organizationId
-      )
-      setInstructors(orgInstructors)
+      const orgData = orgRes.status === 'fulfilled' ? (orgRes.value.data?.data || orgRes.value.data) : null;
+      setOrganization(orgData);
 
-      // Get organization departments
-      const orgDepartments = demoDepartments.filter(
-        dept => dept.organizationId === user.organizationId
-      )
-      setDepartments(orgDepartments)
+      const users = usersRes.status === 'fulfilled'
+        ? (usersRes.value.data?.data?.users || usersRes.value.data?.data || usersRes.value.data?.users || [])
+        : [];
+      setInstructors(users.map(u => ({ ...u, id: u.id || u._id })));
+
+      const depts = deptsRes.status === 'fulfilled'
+        ? (deptsRes.value.data?.data?.departments || deptsRes.value.data?.data || deptsRes.value.data?.departments || [])
+        : [];
+      setDepartments(depts.map(d => ({ ...d, id: d.id || d._id })));
     } catch (error) {
       console.error('Failed to load organization data:', error)
     } finally {

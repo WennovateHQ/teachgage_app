@@ -5,7 +5,7 @@ import Link from 'next/link'
 import DashboardLayout from '../../../components/layout/DashboardLayout'
 import Breadcrumb from '../../../components/common/Breadcrumb'
 import { useAuth } from '../../../contexts/AuthContext'
-import { demoCourses, demoSurveys, getDemoCourseById } from '../../../data/demoData'
+import { courseAPI, surveyAPI } from '../../../utils/api'
 import { 
   ArrowLeft,
   Edit,
@@ -25,6 +25,7 @@ import {
   Download
 } from 'lucide-react'
 import { format } from 'date-fns'
+import EnrollmentCSVUpload from '../../../components/courses/EnrollmentCSVUpload'
 
 export default function CourseDetailPage() {
   const router = useRouter()
@@ -32,20 +33,44 @@ export default function CourseDetailPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   const [course, setCourse] = useState(null)
   const [surveys, setSurveys] = useState([])
+  const [courseAnalytics, setCourseAnalytics] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+  const [showCSVUpload, setShowCSVUpload] = useState(false)
+
+  const loadCourseData = async () => {
+    if (!id) return;
+    setIsLoading(true);
+    try {
+      const [courseRes, surveysRes, analyticsRes] = await Promise.allSettled([
+        courseAPI.getCourse(id),
+        surveyAPI.getSurveys({ courseId: id }),
+        courseAPI.getCourseAnalytics(id),
+      ]);
+
+      if (courseRes.status === 'fulfilled') {
+        const courseData = courseRes.value.data?.data || courseRes.value.data;
+        setCourse(courseData ? { ...courseData, id: courseData.id || courseData._id } : null);
+      }
+
+      if (surveysRes.status === 'fulfilled') {
+        const surveysData = surveysRes.value.data?.data?.surveys || surveysRes.value.data?.data || surveysRes.value.data?.surveys || [];
+        setSurveys(surveysData.map(s => ({ ...s, id: s.id || s._id })));
+      }
+
+      if (analyticsRes.status === 'fulfilled') {
+        const analyticsData = analyticsRes.value.data?.data || analyticsRes.value.data;
+        setCourseAnalytics(analyticsData);
+      }
+    } catch (error) {
+      console.error('Failed to load course data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (id) {
-      const courseData = getDemoCourseById(id)
-      setCourse(courseData)
-      
-      // Get surveys for this course
-      const courseSurveys = demoSurveys.filter(survey => survey.courseId === id)
-      setSurveys(courseSurveys)
-      
-      setIsLoading(false)
-    }
+    loadCourseData();
   }, [id])
 
   if (authLoading || isLoading) {
@@ -94,17 +119,17 @@ export default function CourseDetailPage() {
 
   const breadcrumbItems = [
     { name: 'Courses', href: '/dashboard/courses', icon: BookOpen },
-    { name: course.title }
+    { name: course.name || course.title }
   ]
 
   return (
     <>
       <Head>
-        <title>{course.title} - TeachGage</title>
+        <title>{course.name || course.title} - TeachGage</title>
         <meta name="description" content={course.description} />
       </Head>
 
-      <DashboardLayout title={course.title}>
+      <DashboardLayout title={course.name || course.title}>
         <div className="space-y-6">
           {/* Breadcrumb */}
           <Breadcrumb items={breadcrumbItems} />
@@ -114,7 +139,7 @@ export default function CourseDetailPage() {
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center space-x-3 mb-2">
-                  <h1 className="text-2xl font-bold text-teachgage-blue">{course.title}</h1>
+                  <h1 className="text-2xl font-bold text-teachgage-blue">{course.name || course.title}</h1>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                     course.status === 'active' 
                       ? 'bg-teachgage-green text-white'
@@ -131,15 +156,15 @@ export default function CourseDetailPage() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                   <div className="flex items-center text-teachgage-navy">
                     <Users className="w-4 h-4 mr-2" />
-                    <span>{course.currentStudents}/{course.maxStudents} Students</span>
+                    <span>{course.currentStudents || 0}/{course.capacity || course.maxStudents || 30} Students</span>
                   </div>
                   <div className="flex items-center text-teachgage-navy">
                     <Calendar className="w-4 h-4 mr-2" />
-                    <span>{format(new Date(course.startDate), 'MMM d, yyyy')}</span>
+                    <span>{course.startDate ? format(new Date(course.startDate), 'MMM d, yyyy') : 'TBD'}</span>
                   </div>
                   <div className="flex items-center text-teachgage-navy">
                     <Clock className="w-4 h-4 mr-2" />
-                    <span>{course.duration || '12 weeks'}</span>
+                    <span>{course.duration || (course.startDate && course.endDate ? `${Math.ceil((new Date(course.endDate) - new Date(course.startDate)) / (1000 * 60 * 60 * 24 * 7))} weeks` : 'TBD')}</span>
                   </div>
                   <div className="flex items-center text-teachgage-navy">
                     <FileText className="w-4 h-4 mr-2" />
@@ -201,19 +226,29 @@ export default function CourseDetailPage() {
                     <div className="lg:col-span-2">
                       <h3 className="text-lg font-semibold text-teachgage-blue mb-4">Course Description</h3>
                       <div className="prose max-w-none text-teachgage-navy">
-                        <p>{course.description}</p>
-                        <p>This comprehensive course covers all essential topics and provides hands-on experience through practical exercises and real-world projects.</p>
+                        <p>{course.description || 'No description provided.'}</p>
                         
-                        <h4 className="text-teachgage-blue font-semibold mt-6 mb-3">Learning Objectives</h4>
-                        <ul className="list-disc pl-6 space-y-1">
-                          <li>Master fundamental concepts and principles</li>
-                          <li>Apply theoretical knowledge to practical scenarios</li>
-                          <li>Develop critical thinking and problem-solving skills</li>
-                          <li>Complete hands-on projects and assignments</li>
-                        </ul>
+                        {course.objectives && course.objectives.length > 0 && (
+                          <>
+                            <h4 className="text-teachgage-blue font-semibold mt-6 mb-3">Learning Objectives</h4>
+                            <ul className="list-disc pl-6 space-y-1">
+                              {course.objectives.map((objective, index) => (
+                                <li key={index}>{objective}</li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
                         
-                        <h4 className="text-teachgage-blue font-semibold mt-6 mb-3">Prerequisites</h4>
-                        <p>Basic understanding of the subject matter is recommended but not required.</p>
+                        {course.prerequisites && course.prerequisites.length > 0 && (
+                          <>
+                            <h4 className="text-teachgage-blue font-semibold mt-6 mb-3">Prerequisites</h4>
+                            <ul className="list-disc pl-6 space-y-1">
+                              {course.prerequisites.map((prereq, index) => (
+                                <li key={index}>{prereq}</li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
                       </div>
                     </div>
                     
@@ -223,29 +258,29 @@ export default function CourseDetailPage() {
                         <div className="bg-gray-50 rounded-lg p-4">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-teachgage-navy">Enrollment</span>
-                            <span className="text-sm text-teachgage-blue">{Math.round((course.currentStudents / course.maxStudents) * 100)}%</span>
+                            <span className="text-sm text-teachgage-blue">{Math.round(((course.currentStudents || 0) / (course.capacity || course.maxStudents || 30)) * 100)}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
                               className="bg-teachgage-blue h-2 rounded-full"
-                              style={{ width: `${(course.currentStudents / course.maxStudents) * 100}%` }}
+                              style={{ width: `${((course.currentStudents || 0) / (course.capacity || course.maxStudents || 30)) * 100}%` }}
                             ></div>
                           </div>
-                          <p className="text-xs text-teachgage-navy mt-1">{course.currentStudents} of {course.maxStudents} students</p>
+                          <p className="text-xs text-teachgage-navy mt-1">{course.currentStudents || 0} of {course.capacity || course.maxStudents || 30} students</p>
                         </div>
                         
                         <div className="space-y-2">
                           <div className="flex justify-between">
                             <span className="text-sm text-teachgage-navy">Start Date:</span>
-                            <span className="text-sm font-medium text-teachgage-blue">{format(new Date(course.startDate), 'MMM d, yyyy')}</span>
+                            <span className="text-sm font-medium text-teachgage-blue">{course.startDate ? format(new Date(course.startDate), 'MMM d, yyyy') : 'TBD'}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-sm text-teachgage-navy">End Date:</span>
-                            <span className="text-sm font-medium text-teachgage-blue">{format(new Date(course.endDate), 'MMM d, yyyy')}</span>
+                            <span className="text-sm font-medium text-teachgage-blue">{course.endDate ? format(new Date(course.endDate), 'MMM d, yyyy') : 'TBD'}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-sm text-teachgage-navy">Duration:</span>
-                            <span className="text-sm font-medium text-teachgage-blue">{course.duration || '12 weeks'}</span>
+                            <span className="text-sm font-medium text-teachgage-blue">{course.duration || (course.startDate && course.endDate ? `${Math.ceil((new Date(course.endDate) - new Date(course.startDate)) / (1000 * 60 * 60 * 24 * 7))} weeks` : 'TBD')}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-sm text-teachgage-navy">Course Code:</span>
@@ -338,9 +373,12 @@ export default function CourseDetailPage() {
                         <Download className="w-4 h-4 mr-2" />
                         Export List
                       </button>
-                      <button className="inline-flex items-center px-4 py-2 bg-teachgage-blue text-white rounded-lg hover:bg-teachgage-medium-blue transition-colors">
+                      <button 
+                        onClick={() => setShowCSVUpload(true)}
+                        className="inline-flex items-center px-4 py-2 bg-teachgage-blue text-white rounded-lg hover:bg-teachgage-medium-blue transition-colors"
+                      >
                         <Plus className="w-4 h-4 mr-2" />
-                        Add Student
+                        Enroll Students
                       </button>
                     </div>
                   </div>
@@ -374,7 +412,7 @@ export default function CourseDetailPage() {
                               student{i + 1}@university.edu
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-teachgage-navy">
-                              {format(new Date(course.startDate), 'MMM d, yyyy')}
+                              {course.startDate ? format(new Date(course.startDate), 'MMM d, yyyy') : 'TBD'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-teachgage-green text-white">
@@ -431,7 +469,9 @@ export default function CourseDetailPage() {
                         </div>
                         <div className="ml-4">
                           <p className="text-sm font-medium text-teachgage-navy">Avg. Rating</p>
-                          <p className="text-2xl font-bold text-teachgage-blue">4.6</p>
+                          <p className="text-2xl font-bold text-teachgage-blue">
+                            {courseAnalytics?.averageRating?.toFixed(1) || 'N/A'}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -443,24 +483,64 @@ export default function CourseDetailPage() {
                         </div>
                         <div className="ml-4">
                           <p className="text-sm font-medium text-teachgage-navy">Completion Rate</p>
-                          <p className="text-2xl font-bold text-teachgage-blue">87%</p>
+                          <p className="text-2xl font-bold text-teachgage-blue">
+                            {courseAnalytics?.completionRate ? `${Math.round(courseAnalytics.completionRate)}%` : 'N/A'}
+                          </p>
                         </div>
                       </div>
                     </div>
                   </div>
                   
-                  {/* Charts would go here */}
-                  <div className="bg-gray-50 rounded-lg p-8 text-center">
-                    <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h4 className="text-lg font-medium text-teachgage-blue mb-2">Detailed Analytics Coming Soon</h4>
-                    <p className="text-teachgage-navy">Advanced charts and insights will be available in the next update.</p>
-                  </div>
+                  {/* Analytics Summary */}
+                  {courseAnalytics ? (
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                      <h4 className="text-md font-semibold text-teachgage-blue mb-4">Performance Summary</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex justify-between py-2 border-b border-gray-100">
+                          <span className="text-sm text-teachgage-navy">Total Enrollments</span>
+                          <span className="text-sm font-medium text-teachgage-blue">{course?.currentStudents || course?.enrollment_count || 0}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-gray-100">
+                          <span className="text-sm text-teachgage-navy">Active Surveys</span>
+                          <span className="text-sm font-medium text-teachgage-blue">{surveys.filter(s => s.status === 'active').length}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-gray-100">
+                          <span className="text-sm text-teachgage-navy">Total Responses</span>
+                          <span className="text-sm font-medium text-teachgage-blue">{courseAnalytics?.totalResponses || surveys.reduce((acc, s) => acc + (s.responseCount || s.responses || 0), 0)}</span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-gray-100">
+                          <span className="text-sm text-teachgage-navy">Response Rate</span>
+                          <span className="text-sm font-medium text-teachgage-blue">{courseAnalytics?.responseRate ? `${Math.round(courseAnalytics.responseRate)}%` : 'N/A'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 rounded-lg p-8 text-center">
+                      <BarChart3 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                      <h4 className="text-lg font-medium text-teachgage-blue mb-2">No Analytics Data Yet</h4>
+                      <p className="text-teachgage-navy">Analytics will appear once surveys receive responses.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
         </div>
       </DashboardLayout>
+
+      {/* CSV Upload Modal */}
+      {showCSVUpload && (
+        <EnrollmentCSVUpload
+          courseId={id}
+          courseName={course?.name}
+          onClose={() => setShowCSVUpload(false)}
+          onSuccess={() => {
+            setShowCSVUpload(false)
+            // Refresh course data to show new students
+            loadCourseData()
+          }}
+        />
+      )}
     </>
   )
 }

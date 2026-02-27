@@ -16,6 +16,7 @@ import {
   Shield
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { departmentAPI } from '../../../utils/api'
 
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState([])
@@ -25,106 +26,13 @@ export default function DepartmentsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
 
   useEffect(() => {
-    // Simulate API call to fetch departments
     const fetchDepartments = async () => {
       try {
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        const mockDepartments = [
-          {
-            id: 'dept_1',
-            name: 'Computer Science',
-            code: 'CS',
-            description: 'Department of Computer Science and Engineering',
-            adminId: 'user_1',
-            adminName: 'Dr. Sarah Johnson',
-            userCount: 45,
-            courseCount: 12,
-            activeEvaluations: 8,
-            createdAt: '2023-09-01',
-            settings: {
-              allowSelfEnrollment: false,
-              requireApproval: true,
-              autoAssignSurveys: true
-            },
-            status: 'active'
-          },
-          {
-            id: 'dept_2',
-            name: 'Mathematics',
-            code: 'MATH',
-            description: 'Department of Mathematics and Statistics',
-            adminId: 'user_2',
-            adminName: 'Prof. Michael Chen',
-            userCount: 32,
-            courseCount: 15,
-            activeEvaluations: 12,
-            createdAt: '2023-09-01',
-            settings: {
-              allowSelfEnrollment: true,
-              requireApproval: false,
-              autoAssignSurveys: true
-            },
-            status: 'active'
-          },
-          {
-            id: 'dept_3',
-            name: 'Business Administration',
-            code: 'BUS',
-            description: 'School of Business Administration',
-            adminId: 'user_3',
-            adminName: 'Dr. Emily Rodriguez',
-            userCount: 38,
-            courseCount: 8,
-            activeEvaluations: 5,
-            createdAt: '2023-09-15',
-            settings: {
-              allowSelfEnrollment: false,
-              requireApproval: true,
-              autoAssignSurveys: false
-            },
-            status: 'active'
-          },
-          {
-            id: 'dept_4',
-            name: 'Physics',
-            code: 'PHYS',
-            description: 'Department of Physics and Astronomy',
-            adminId: 'user_4',
-            adminName: 'Dr. James Wilson',
-            userCount: 28,
-            courseCount: 10,
-            activeEvaluations: 7,
-            createdAt: '2023-10-01',
-            settings: {
-              allowSelfEnrollment: true,
-              requireApproval: true,
-              autoAssignSurveys: true
-            },
-            status: 'active'
-          },
-          {
-            id: 'dept_5',
-            name: 'English Literature',
-            code: 'ENG',
-            description: 'Department of English and Literature',
-            adminId: 'user_5',
-            adminName: 'Prof. Lisa Anderson',
-            userCount: 22,
-            courseCount: 18,
-            activeEvaluations: 3,
-            createdAt: '2023-08-20',
-            settings: {
-              allowSelfEnrollment: false,
-              requireApproval: false,
-              autoAssignSurveys: true
-            },
-            status: 'inactive'
-          }
-        ]
-        
-        setDepartments(mockDepartments)
-        setFilteredDepartments(mockDepartments)
+        const response = await departmentAPI.getDepartments()
+        const data = response.data?.data || response.data || []
+        const depts = Array.isArray(data) ? data : data.departments || []
+        setDepartments(depts)
+        setFilteredDepartments(depts)
       } catch (error) {
         console.error('Error fetching departments:', error)
         toast.error('Failed to load departments')
@@ -132,7 +40,6 @@ export default function DepartmentsPage() {
         setLoading(false)
       }
     }
-
     fetchDepartments()
   }, [])
 
@@ -159,10 +66,16 @@ export default function DepartmentsPage() {
     console.log('Edit department:', deptId)
   }
 
-  const handleDeleteDepartment = (deptId) => {
+  const handleDeleteDepartment = async (deptId) => {
     if (confirm('Are you sure you want to delete this department?')) {
-      setDepartments(prev => prev.filter(dept => dept.id !== deptId))
-      toast.success('Department deleted successfully')
+      try {
+        await departmentAPI.deleteDepartment(deptId)
+        setDepartments(prev => prev.filter(dept => (dept.id || dept._id) !== deptId))
+        toast.success('Department deleted successfully')
+      } catch (error) {
+        console.error('Error deleting department:', error)
+        toast.error(error.response?.data?.message || 'Failed to delete department')
+      }
     }
   }
 

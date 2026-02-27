@@ -5,26 +5,30 @@ import Link from 'next/link'
 import DashboardLayout from '../../../../components/layout/DashboardLayout'
 import Breadcrumb from '../../../../components/common/Breadcrumb'
 import { useAuth } from '../../../../contexts/AuthContext'
-import { demoSurveys } from '../../../../data/demoData'
+import { surveyAPI, questionnaireAPI, courseAPI } from '../../../../utils/api'
 import { 
   ArrowLeft,
   Save,
   X,
-  Plus,
-  GripVertical,
-  Star,
-  CheckSquare,
+  Calendar,
+  Users,
   MessageSquare,
   FileText,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  ClipboardList,
+  ExternalLink,
+  Edit3
 } from 'lucide-react'
+import { format } from 'date-fns'
 
 export default function EditSurveyPage() {
   const router = useRouter()
   const { id } = router.query
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   const [survey, setSurvey] = useState(null)
+  const [questionnaire, setQuestionnaire] = useState(null)
+  const [courses, setCourses] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
@@ -33,27 +37,64 @@ export default function EditSurveyPage() {
     title: '',
     description: '',
     status: 'draft',
-    questions: []
+    courseId: '',
+    startDate: '',
+    endDate: '',
+    anonymousResponses: true,
+    showResultsToInstructor: true
   })
 
   useEffect(() => {
-    if (id) {
-      // Simulate API call to get survey details
-      setTimeout(() => {
-        const surveyData = demoSurveys.find(survey => survey.id === id)
+    const loadData = async () => {
+      if (!router.isReady || !id) return;
+      setIsLoading(true);
+      try {
+        // Load survey
+        const surveyResponse = await surveyAPI.getSurvey(id);
+        const surveyData = surveyResponse.data?.survey || surveyResponse.data?.data || surveyResponse.data;
+        
         if (surveyData) {
-          setSurvey(surveyData)
+          setSurvey({ ...surveyData, id: surveyData.id || surveyData._id });
           setFormData({
             title: surveyData.title || '',
             description: surveyData.description || '',
             status: surveyData.status || 'draft',
-            questions: surveyData.questions || []
-          })
+            courseId: surveyData.courseId || '',
+            startDate: surveyData.startDate ? surveyData.startDate.split('T')[0] : '',
+            endDate: surveyData.endDate ? surveyData.endDate.split('T')[0] : '',
+            anonymousResponses: surveyData.anonymousResponses !== false,
+            showResultsToInstructor: surveyData.showResultsToInstructor !== false
+          });
+          
+          // Load linked questionnaire if exists
+          if (surveyData.questionnaireId) {
+            try {
+              const qResponse = await questionnaireAPI.getQuestionnaire(surveyData.questionnaireId);
+              const qData = qResponse.data?.data || qResponse.data;
+              setQuestionnaire(qData);
+            } catch (qErr) {
+              console.error('Failed to load questionnaire:', qErr);
+            }
+          }
         }
-        setIsLoading(false)
-      }, 500)
-    }
-  }, [id])
+        
+        // Load courses for dropdown
+        try {
+          const coursesResponse = await courseAPI.getCourses();
+          const coursesData = coursesResponse.data?.data || coursesResponse.data?.courses || [];
+          setCourses(Array.isArray(coursesData) ? coursesData : []);
+        } catch (cErr) {
+          console.error('Failed to load courses:', cErr);
+        }
+      } catch (error) {
+        console.error('Failed to load survey:', error);
+        setMessage({ type: 'error', text: 'Failed to load survey data.' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, [router.isReady, id])
 
   if (authLoading || isLoading) {
     return (
@@ -87,83 +128,10 @@ export default function EditSurveyPage() {
   }
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target
+    const { name, value, type, checked } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: value
-    }))
-  }
-
-  const handleQuestionChange = (questionIndex, field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      questions: prev.questions.map((question, index) => 
-        index === questionIndex 
-          ? { ...question, [field]: value }
-          : question
-      )
-    }))
-  }
-
-  const addQuestion = () => {
-    const newQuestion = {
-      id: Date.now().toString(),
-      question: '',
-      type: 'text',
-      required: false,
-      options: []
-    }
-    setFormData(prev => ({
-      ...prev,
-      questions: [...prev.questions, newQuestion]
-    }))
-  }
-
-  const removeQuestion = (questionIndex) => {
-    setFormData(prev => ({
-      ...prev,
-      questions: prev.questions.filter((_, index) => index !== questionIndex)
-    }))
-  }
-
-  const addOption = (questionIndex) => {
-    setFormData(prev => ({
-      ...prev,
-      questions: prev.questions.map((question, index) => 
-        index === questionIndex 
-          ? { ...question, options: [...(question.options || []), ''] }
-          : question
-      )
-    }))
-  }
-
-  const updateOption = (questionIndex, optionIndex, value) => {
-    setFormData(prev => ({
-      ...prev,
-      questions: prev.questions.map((question, index) => 
-        index === questionIndex 
-          ? { 
-              ...question, 
-              options: question.options.map((option, oIndex) => 
-                oIndex === optionIndex ? value : option
-              )
-            }
-          : question
-      )
-    }))
-  }
-
-  const removeOption = (questionIndex, optionIndex) => {
-    setFormData(prev => ({
-      ...prev,
-      questions: prev.questions.map((question, index) => 
-        index === questionIndex 
-          ? { 
-              ...question, 
-              options: question.options.filter((_, oIndex) => oIndex !== optionIndex)
-            }
-          : question
-      )
+      [name]: type === 'checkbox' ? checked : value
     }))
   }
 
@@ -172,35 +140,36 @@ export default function EditSurveyPage() {
     setIsSaving(true)
     setMessage({ type: '', text: '' })
 
-    // Basic validation
     if (!formData.title.trim()) {
       setMessage({ type: 'error', text: 'Survey title is required.' })
       setIsSaving(false)
       return
     }
 
-    if (formData.questions.length === 0) {
-      setMessage({ type: 'error', text: 'At least one question is required.' })
-      setIsSaving(false)
-      return
-    }
-
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const updateData = {
+        title: formData.title,
+        description: formData.description,
+        status: formData.status,
+        courseId: formData.courseId || undefined,
+        startDate: formData.startDate || undefined,
+        endDate: formData.endDate || undefined,
+        anonymousResponses: formData.anonymousResponses,
+        showResultsToInstructor: formData.showResultsToInstructor
+      }
       
-      console.log('Updating survey:', formData)
-      setMessage({ type: 'success', text: 'Survey updated successfully!' })
+      await surveyAPI.updateSurvey(id, updateData);
+      setMessage({ type: 'success', text: 'Survey updated successfully!' });
       
-      // Redirect back to survey detail page after a short delay
       setTimeout(() => {
-        router.push(`/dashboard/feedback-forms/${id}`)
-      }, 1500)
+        router.push(`/dashboard/feedback-forms/${id}`);
+      }, 1500);
     } catch (error) {
-      console.error('Failed to update survey:', error)
-      setMessage({ type: 'error', text: 'Failed to update survey. Please try again.' })
+      console.error('Failed to update survey:', error);
+      const errMsg = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to update survey.';
+      setMessage({ type: 'error', text: errMsg });
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
   }
 
@@ -209,15 +178,6 @@ export default function EditSurveyPage() {
     { name: survey.title, href: `/dashboard/feedback-forms/${id}` },
     { name: 'Edit' }
   ]
-
-  const getQuestionTypeIcon = (type) => {
-    switch (type) {
-      case 'rating': return Star
-      case 'multiple_choice': return CheckSquare
-      case 'text': return MessageSquare
-      default: return FileText
-    }
-  }
 
   return (
     <>
@@ -236,7 +196,7 @@ export default function EditSurveyPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-teachgage-blue">Edit Survey</h1>
-                <p className="text-teachgage-navy">Make changes to your survey questions and settings</p>
+                <p className="text-teachgage-navy">Update survey settings and configuration</p>
               </div>
               <Link href={`/dashboard/feedback-forms/${id}`}>
                 <button className="inline-flex items-center px-4 py-2 text-teachgage-navy border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
@@ -320,130 +280,168 @@ export default function EditSurveyPage() {
               </div>
             </div>
 
-            {/* Questions */}
+            {/* Course & Schedule */}
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-teachgage-blue mb-4">Course & Schedule</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="courseId" className="block text-sm font-medium text-gray-700 mb-1">
+                    Course
+                  </label>
+                  <select
+                    id="courseId"
+                    name="courseId"
+                    value={formData.courseId}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
+                  >
+                    <option value="">Select a course</option>
+                    {courses.map(course => (
+                      <option key={course._id || course.id} value={course._id || course.id}>
+                        {course.name || course.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    id="startDate"
+                    name="startDate"
+                    value={formData.startDate}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    id="endDate"
+                    name="endDate"
+                    value={formData.endDate}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Response Settings */}
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-teachgage-blue mb-4">Response Settings</h2>
+              
+              <div className="space-y-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    name="anonymousResponses"
+                    checked={formData.anonymousResponses}
+                    onChange={handleInputChange}
+                    className="h-4 w-4 text-teachgage-blue focus:ring-teachgage-blue border-gray-300 rounded"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Anonymous responses (recommended)</span>
+                </label>
+
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    name="showResultsToInstructor"
+                    checked={formData.showResultsToInstructor}
+                    onChange={handleInputChange}
+                    className="h-4 w-4 text-teachgage-blue focus:ring-teachgage-blue border-gray-300 rounded"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Show results to instructor</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Linked Questionnaire */}
             <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-teachgage-blue">Questions</h2>
-                <button
-                  type="button"
-                  onClick={addQuestion}
-                  className="inline-flex items-center px-4 py-2 bg-teachgage-blue text-white rounded-lg hover:bg-teachgage-medium-blue transition-colors"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Question
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {formData.questions.map((question, questionIndex) => {
-                  const Icon = getQuestionTypeIcon(question.type)
-                  return (
-                    <div key={question.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center">
-                          <GripVertical className="w-4 h-4 text-gray-400 mr-2" />
-                          <Icon className="w-4 h-4 text-teachgage-blue mr-2" />
-                          <span className="text-sm font-medium text-teachgage-navy">
-                            Question {questionIndex + 1}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeQuestion(questionIndex)}
-                          className="p-1 text-red-500 hover:text-red-700"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Question Text *
-                          </label>
-                          <input
-                            type="text"
-                            value={question.question}
-                            onChange={(e) => handleQuestionChange(questionIndex, 'question', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
-                            placeholder="Enter your question"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Question Type
-                          </label>
-                          <select
-                            value={question.type}
-                            onChange={(e) => handleQuestionChange(questionIndex, 'type', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
-                          >
-                            <option value="text">Text</option>
-                            <option value="multiple_choice">Multiple Choice</option>
-                            <option value="rating">Rating</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {question.type === 'multiple_choice' && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Options
-                          </label>
-                          <div className="space-y-2">
-                            {(question.options || []).map((option, optionIndex) => (
-                              <div key={optionIndex} className="flex items-center">
-                                <input
-                                  type="text"
-                                  value={option}
-                                  onChange={(e) => updateOption(questionIndex, optionIndex, e.target.value)}
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
-                                  placeholder={`Option ${optionIndex + 1}`}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => removeOption(questionIndex, optionIndex)}
-                                  className="ml-2 p-1 text-red-500 hover:text-red-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
-                            <button
-                              type="button"
-                              onClick={() => addOption(questionIndex)}
-                              className="text-sm text-teachgage-blue hover:text-teachgage-orange"
-                            >
-                              + Add Option
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="mt-3">
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={question.required}
-                            onChange={(e) => handleQuestionChange(questionIndex, 'required', e.target.checked)}
-                            className="h-4 w-4 text-teachgage-blue focus:ring-teachgage-blue border-gray-300 rounded"
-                          />
-                          <span className="ml-2 text-sm text-gray-700">Required question</span>
-                        </label>
-                      </div>
-                    </div>
-                  )
-                })}
-
-                {formData.questions.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <MessageSquare className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <p>No questions added yet. Click "Add Question" to get started.</p>
-                  </div>
+                <h2 className="text-lg font-semibold text-teachgage-blue">Linked Questionnaire</h2>
+                {questionnaire && (
+                  <Link href={`/dashboard/questionnaires/${questionnaire._id || questionnaire.id}`}>
+                    <button type="button" className="inline-flex items-center px-4 py-2 bg-teachgage-blue text-white rounded-lg hover:bg-teachgage-dark-blue transition-colors">
+                      <Edit3 className="w-4 h-4 mr-2" />
+                      Edit Questions
+                    </button>
+                  </Link>
                 )}
               </div>
+
+              {questionnaire ? (
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <ClipboardList className="w-6 h-6 text-teachgage-blue" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-gray-900">{questionnaire.title}</h3>
+                        <p className="text-sm text-gray-500 mt-1">{questionnaire.description || 'No description'}</p>
+                        <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                          <span className="flex items-center">
+                            <FileText className="w-4 h-4 mr-1" />
+                            {questionnaire.questions?.length || 0} questions
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs ${
+                            questionnaire.status === 'published' 
+                              ? 'bg-green-100 text-green-700' 
+                              : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {questionnaire.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <Link href={`/dashboard/questionnaires/${questionnaire._id || questionnaire.id}`}>
+                      <span className="text-teachgage-blue hover:underline text-sm flex items-center">
+                        View <ExternalLink className="w-3 h-3 ml-1" />
+                      </span>
+                    </Link>
+                  </div>
+
+                  {/* Questions preview */}
+                  {questionnaire.questions && questionnaire.questions.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Questions Preview:</p>
+                      <ul className="space-y-2">
+                        {questionnaire.questions.slice(0, 5).map((q, idx) => (
+                          <li key={q.questionId || idx} className="text-sm text-gray-600 flex items-start">
+                            <span className="text-gray-400 mr-2">{idx + 1}.</span>
+                            <span>{q.text || q.question}</span>
+                            {q.required && <span className="text-red-500 ml-1">*</span>}
+                          </li>
+                        ))}
+                        {questionnaire.questions.length > 5 && (
+                          <li className="text-sm text-gray-500 italic">
+                            ... and {questionnaire.questions.length - 5} more questions
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 border border-dashed border-gray-300 rounded-lg">
+                  <ClipboardList className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 mb-4">No questionnaire linked to this survey</p>
+                  <Link href="/dashboard/questionnaires/create">
+                    <button type="button" className="inline-flex items-center px-4 py-2 bg-teachgage-blue text-white rounded-lg hover:bg-teachgage-dark-blue transition-colors">
+                      Create Questionnaire
+                    </button>
+                  </Link>
+                </div>
+              )}
             </div>
 
             {/* Save Button */}

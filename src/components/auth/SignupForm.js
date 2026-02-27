@@ -97,8 +97,11 @@ export default function SignupForm() {
     }
 
     try {
-      await register(formData);
-      router.push('/dashboard');
+      const result = await register(formData);
+      if (result.success) {
+        // Redirect to login page with success message
+        router.push('/auth/signin?registered=true&message=Registration successful! Please check your email to verify your account before logging in.');
+      }
     } catch (err) {
       // Error is handled by the auth context
       console.error('Registration failed:', err);

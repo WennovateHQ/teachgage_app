@@ -54,7 +54,9 @@ function getQuestionTypeDescription(type) {
     matrix: 'Grid of questions and answer options',
     rank_order: 'Drag to rank options in order of preference',
     dichotomous: 'Simple Yes/No or True/False question',
-    opinion_scale: 'Numeric scale with custom labels'
+    opinion_scale: 'Numeric scale with custom labels',
+    nps: 'Net Promoter Score (0-10 recommendation scale)',
+    demographic: 'Collect demographic information (age, gender, etc.)'
   }
   
   return descriptions[type] || 'Custom question type'

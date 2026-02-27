@@ -5,7 +5,7 @@ import Link from 'next/link'
 import DashboardLayout from '../../../../components/layout/DashboardLayout'
 import Breadcrumb from '../../../../components/common/Breadcrumb'
 import { useAuth } from '../../../../contexts/AuthContext'
-import { demoSurveys } from '../../../../data/demoData'
+import { surveyAPI } from '../../../../utils/api'
 import { 
   ArrowLeft,
   Download,
@@ -35,77 +35,45 @@ export default function SurveyResponsesPage() {
   const [dateFilter, setDateFilter] = useState('all')
   const [selectedResponses, setSelectedResponses] = useState([])
 
-  // Generate demo responses
-  const generateDemoResponses = (survey) => {
-    if (!survey || !survey.questions) return []
-    
-    const responses = []
-    const responseCount = survey.responseCount || 0
-    
-    for (let i = 0; i < responseCount; i++) {
-      const response = {
-        id: `response_${i + 1}`,
-        submittedAt: new Date(Date.now() - i * 86400000 - Math.random() * 86400000),
-        answers: survey.questions.map(question => {
-          switch (question.type) {
-            case 'rating':
-              return {
-                questionId: question.id,
-                question: question.question,
-                type: question.type,
-                value: Math.floor(Math.random() * 5) + 1
-              }
-            case 'multiple_choice':
-              const options = question.options || ['Option 1', 'Option 2', 'Option 3']
-              return {
-                questionId: question.id,
-                question: question.question,
-                type: question.type,
-                value: options[Math.floor(Math.random() * options.length)]
-              }
-            case 'text':
-            default:
-              const textResponses = [
-                'This course was very helpful and informative.',
-                'I enjoyed the practical examples and hands-on activities.',
-                'The instructor was knowledgeable and engaging.',
-                'Could use more interactive elements.',
-                'Great content, well organized.',
-                'The pace was just right for me.',
-                'Would recommend to others.',
-                'Some topics could be explained in more detail.'
-              ]
-              return {
-                questionId: question.id,
-                question: question.question,
-                type: question.type,
-                value: textResponses[Math.floor(Math.random() * textResponses.length)]
-              }
-          }
-        }),
-        isAnonymous: true
-      }
-      responses.push(response)
-    }
-    
-    return responses.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
-  }
-
   useEffect(() => {
-    if (id) {
-      // Simulate API call to get survey details and responses
-      setTimeout(() => {
-        const surveyData = demoSurveys.find(survey => survey.id === id)
-        if (surveyData) {
-          setSurvey(surveyData)
-          const demoResponses = generateDemoResponses(surveyData)
-          setResponses(demoResponses)
-          setFilteredResponses(demoResponses)
+    const loadSurveyAndResponses = async () => {
+      if (!router.isReady || !id) return;
+      setIsLoading(true);
+      try {
+        const [surveyRes, responsesRes] = await Promise.allSettled([
+          surveyAPI.getSurvey(id),
+          surveyAPI.getResponses(id),
+        ]);
+
+        if (surveyRes.status === 'fulfilled') {
+          const surveyData = surveyRes.value.data?.survey || surveyRes.value.data?.data || surveyRes.value.data;
+          setSurvey({
+            ...surveyData,
+            id: surveyData.id || surveyData._id,
+            responseCount: surveyData.responseCount || surveyData.totalResponses || 0,
+            questions: surveyData.questions || [],
+          });
         }
-        setIsLoading(false)
-      }, 500)
-    }
-  }, [id])
+
+        if (responsesRes.status === 'fulfilled') {
+          const responsesData = responsesRes.value.data?.data?.responses || responsesRes.value.data?.data || responsesRes.value.data?.responses || [];
+          const formattedResponses = responsesData.map((r, i) => ({
+            id: r.id || r._id || `response_${i + 1}`,
+            submittedAt: r.submittedAt || r.createdAt || new Date().toISOString(),
+            answers: r.answers || r.responses || [],
+            isAnonymous: r.isAnonymous ?? r.anonymous ?? true,
+          }));
+          setResponses(formattedResponses);
+          setFilteredResponses(formattedResponses);
+        }
+      } catch (error) {
+        console.error('Failed to load survey responses:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSurveyAndResponses();
+  }, [router.isReady, id])
 
   useEffect(() => {
     let filtered = responses

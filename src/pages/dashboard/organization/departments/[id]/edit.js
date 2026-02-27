@@ -4,11 +4,7 @@ import Head from 'next/head'
 import DashboardLayout from '../../../../../components/layout/DashboardLayout'
 import Breadcrumb from '../../../../../components/common/Breadcrumb'
 import { useAuth } from '../../../../../contexts/AuthContext'
-import { 
-  demoDepartments,
-  demoUsers,
-  demoOrganizations
-} from '../../../../../data/demoData'
+import { organizationAPI, departmentAPI, userAPI } from '../../../../../utils/api'
 import { 
   Building,
   Save,
@@ -54,38 +50,42 @@ export default function EditDepartmentPage() {
     }
   }, [id, user, isAuthenticated, isLoading, router])
 
-  const loadDepartmentData = () => {
+  const loadDepartmentData = async () => {
     try {
-      // Get department details
-      const deptData = demoDepartments.find(dept => 
-        dept.id === id && dept.organizationId === user.organizationId
-      )
-      
-      if (!deptData) {
-        router.push('/dashboard/organization/departments')
-        return
+      const [deptRes, orgRes, usersRes] = await Promise.allSettled([
+        departmentAPI.getDepartment(id),
+        organizationAPI.getOrganization(user.organizationId),
+        userAPI.getUsers({ departmentId: id, organizationId: user.organizationId }),
+      ]);
+
+      if (deptRes.status === 'fulfilled') {
+        const deptData = deptRes.value.data?.data || deptRes.value.data;
+        if (!deptData) {
+          router.push('/dashboard/organization/departments');
+          return;
+        }
+        setDepartment({ ...deptData, id: deptData.id || deptData._id });
+        setFormData({
+          name: deptData.name || '',
+          code: deptData.code || '',
+          description: deptData.description || '',
+          headId: deptData.headId || '',
+          email: deptData.email || '',
+          phone: deptData.phone || '',
+          location: deptData.location || ''
+        });
+      } else {
+        router.push('/dashboard/organization/departments');
+        return;
       }
-      
-      setDepartment(deptData)
-      setFormData({
-        name: deptData.name || '',
-        code: deptData.code || '',
-        description: deptData.description || '',
-        headId: deptData.headId || '',
-        email: deptData.email || '',
-        phone: deptData.phone || '',
-        location: deptData.location || ''
-      })
 
-      // Get organization details
-      const orgData = demoOrganizations.find(org => org.id === user.organizationId)
-      setOrganization(orgData)
+      const orgData = orgRes.status === 'fulfilled' ? (orgRes.value.data?.data || orgRes.value.data) : null;
+      setOrganization(orgData);
 
-      // Get department users for head selection
-      const deptUsers = demoUsers.organizationInstructors.filter(
-        instructor => instructor.departmentId === id && instructor.organizationId === user.organizationId
-      )
-      setDepartmentUsers(deptUsers)
+      const users = usersRes.status === 'fulfilled'
+        ? (usersRes.value.data?.data?.users || usersRes.value.data?.data || usersRes.value.data?.users || [])
+        : [];
+      setDepartmentUsers(users.map(u => ({ ...u, id: u.id || u._id })));
     } catch (error) {
       console.error('Failed to load department data:', error)
     } finally {
@@ -139,17 +139,13 @@ export default function EditDepartmentPage() {
     setIsSaving(true)
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // In a real app, this would call the backend API
-      alert('Department updated successfully!')
-      router.push(`/dashboard/organization/departments/${id}`)
+      await departmentAPI.updateDepartment(id, formData);
+      router.push(`/dashboard/organization/departments/${id}`);
     } catch (error) {
-      console.error('Save error:', error)
-      alert('Failed to update department. Please try again.')
+      console.error('Save error:', error);
+      alert(error.response?.data?.message || 'Failed to update department. Please try again.');
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
   }
 

@@ -4,6 +4,7 @@ import Head from 'next/head'
 import DashboardLayout from '../../../components/layout/DashboardLayout'
 import Breadcrumb from '../../../components/common/Breadcrumb'
 import { useAuth } from '../../../contexts/AuthContext'
+import { analyticsAPI } from '../../../utils/api'
 import { 
   BarChart3, 
   Users,
@@ -42,39 +43,35 @@ export default function OrganizationAnalyticsPage() {
 
   const loadAnalyticsData = async () => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      const mockAnalytics = {
+      setIsPageLoading(true)
+      const [overviewRes, deptRes] = await Promise.allSettled([
+        analyticsAPI.getOverview({ range: dateRange }),
+        analyticsAPI.getDepartmentAnalytics(user.organizationId, { range: dateRange })
+      ])
+
+      const overview = overviewRes.status === 'fulfilled' ? (overviewRes.value.data?.data || overviewRes.value.data || {}) : {}
+      const deptData = deptRes.status === 'fulfilled' ? (deptRes.value.data?.data || deptRes.value.data || {}) : {}
+
+      setAnalyticsData({
         overview: {
-          totalUsers: 45,
-          activeUsers: 38,
-          totalCourses: 12,
-          activeCourses: 9,
-          totalSurveys: 24,
-          completedSurveys: 18,
-          averageRating: 4.2,
-          responseRate: 78
+          totalUsers: overview.totalUsers || 0,
+          activeUsers: overview.activeUsers || 0,
+          totalCourses: overview.totalCourses || 0,
+          activeCourses: overview.activeCourses || 0,
+          totalSurveys: overview.totalSurveys || 0,
+          completedSurveys: overview.completedSurveys || 0,
+          averageRating: overview.averageRating || 0,
+          responseRate: overview.responseRate || 0
         },
         trends: {
-          userGrowth: 12,
-          courseCompletion: 85,
-          surveyParticipation: 78,
-          satisfaction: 4.2
+          userGrowth: overview.userGrowth || 0,
+          courseCompletion: overview.courseCompletion || 0,
+          surveyParticipation: overview.surveyParticipation || 0,
+          satisfaction: overview.satisfaction || 0
         },
-        departmentStats: [
-          { name: 'Computer Science', users: 18, courses: 5, surveys: 8, avgRating: 4.3 },
-          { name: 'Mathematics', users: 15, courses: 4, surveys: 7, avgRating: 4.1 },
-          { name: 'Physics', users: 12, courses: 3, surveys: 5, avgRating: 4.4 }
-        ],
-        recentActivity: [
-          { type: 'course_completed', description: 'Advanced Algorithms course completed by 15 students', time: '2 hours ago' },
-          { type: 'survey_submitted', description: 'Course feedback survey completed', time: '4 hours ago' },
-          { type: 'user_joined', description: 'New instructor added to Mathematics department', time: '1 day ago' }
-        ]
-      }
-      
-      setAnalyticsData(mockAnalytics)
+        departmentStats: Array.isArray(deptData.departments) ? deptData.departments : (Array.isArray(deptData) ? deptData : []),
+        recentActivity: Array.isArray(overview.recentActivity) ? overview.recentActivity : []
+      })
     } catch (error) {
       console.error('Failed to load analytics data:', error)
     } finally {
@@ -82,9 +79,20 @@ export default function OrganizationAnalyticsPage() {
     }
   }
 
-  const handleExportReport = () => {
-    // Simulate report generation
-    alert('Analytics report export functionality would be implemented here')
+  const handleExportReport = async () => {
+    try {
+      const response = await analyticsAPI.exportData({ range: dateRange, organizationId: user.organizationId })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `analytics-report-${new Date().toISOString().split('T')[0]}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Failed to export report:', error)
+    }
   }
 
   const breadcrumbItems = [
@@ -237,15 +245,19 @@ export default function OrganizationAnalyticsPage() {
             </div>
             <div className="p-6">
               <div className="space-y-4">
-                {analyticsData?.recentActivity.map((activity, index) => (
-                  <div key={index} className="flex items-start space-x-3">
-                    <Activity className="h-5 w-5 text-teachgage-blue mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-900">{activity.description}</p>
-                      <p className="text-xs text-gray-500">{activity.time}</p>
+                {analyticsData?.recentActivity && analyticsData.recentActivity.length > 0 ? (
+                  analyticsData.recentActivity.map((activity, index) => (
+                    <div key={index} className="flex items-start space-x-3">
+                      <Activity className="h-5 w-5 text-teachgage-blue mt-0.5" />
+                      <div>
+                        <p className="text-sm text-gray-900">{activity.description || activity.title}</p>
+                        <p className="text-xs text-gray-500">{activity.time || (activity.createdAt ? new Date(activity.createdAt).toLocaleDateString() : '')}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-4">No recent activity</p>
+                )}
               </div>
             </div>
           </div>

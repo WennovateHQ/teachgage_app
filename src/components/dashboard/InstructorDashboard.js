@@ -3,13 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  getDemoCoursesByInstructor, 
-  getDemoSurveysByCourse, 
-  getDemoNotificationsByUser,
-  demoAnalytics,
-  getTrialDaysRemaining
-} from '@/data/demoData';
+import { courseAPI, surveyAPI, notificationAPI } from '@/utils/api';
 import { 
   BookOpen, 
   BarChart3, 
@@ -40,30 +34,33 @@ export default function InstructorDashboard({ onCreateCourse, onCreateSurvey }) 
 
   // Load dashboard data
   useEffect(() => {
-    const loadDashboardData = () => {
+    const loadDashboardData = async () => {
       if (!user) return;
 
       setIsLoading(true);
 
       try {
-        // Get user's courses
-        const courses = getDemoCoursesByInstructor(user.id);
-        
-        // Get all surveys for user's courses
-        const allSurveys = [];
-        courses.forEach(course => {
-          const courseSurveys = getDemoSurveysByCourse(course.id);
-          allSurveys.push(...courseSurveys);
-        });
+        // Fetch courses and surveys from backend in parallel
+        const [coursesRes, surveysRes, notificationsRes] = await Promise.allSettled([
+          courseAPI.getCourses(),
+          surveyAPI.getSurveys(),
+          notificationAPI.getNotifications({ limit: 5 }),
+        ]);
 
-        // Get user notifications
-        const notifications = getDemoNotificationsByUser(user.id);
+        const courses = coursesRes.status === 'fulfilled' 
+          ? (coursesRes.value.data?.data?.courses || coursesRes.value.data?.data || coursesRes.value.data?.courses || []) 
+          : [];
+        const surveys = surveysRes.status === 'fulfilled' 
+          ? (surveysRes.value.data?.data?.surveys || surveysRes.value.data?.data || surveysRes.value.data?.surveys || []) 
+          : [];
+        const notifications = notificationsRes.status === 'fulfilled' 
+          ? (notificationsRes.value.data?.data?.notifications || notificationsRes.value.data?.data || notificationsRes.value.data?.notifications || []) 
+          : [];
 
-        // Get analytics data
-        const analytics = demoAnalytics.instructorDashboard[user.id] || {
+        const analytics = {
           totalCourses: courses.length,
-          activeSurveys: allSurveys.filter(s => s.status === 'active').length,
-          totalResponses: 0,
+          activeSurveys: surveys.filter(s => s.status === 'active').length,
+          totalResponses: surveys.reduce((sum, s) => sum + (s.totalResponses || s.responseCount || 0), 0),
           averageRating: null,
           responseRate: null,
           recentActivity: []
@@ -71,10 +68,10 @@ export default function InstructorDashboard({ onCreateCourse, onCreateSurvey }) 
 
         setDashboardData({
           courses,
-          surveys: allSurveys,
-          notifications: notifications.slice(0, 5), // Show only recent notifications
+          surveys,
+          notifications: notifications.slice(0, 5),
           analytics,
-          recentActivity: analytics.recentActivity || []
+          recentActivity: []
         });
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
@@ -276,36 +273,39 @@ export default function InstructorDashboard({ onCreateCourse, onCreateSurvey }) 
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {dashboardData.courses.slice(0, 3).map((course) => (
-                    <Link key={course.id} href={`/dashboard/courses/${course.id}`}>
-                      <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-teachgage-blue">{course.title}</h3>
-                          <p className="text-sm text-teachgage-navy">{course.code}</p>
-                          <div className="flex items-center mt-2 text-sm text-teachgage-navy">
-                            <Users className="w-4 h-4 mr-1" />
-                            {course.currentStudents}/{course.maxStudents} students
-                            <Calendar className="w-4 h-4 ml-4 mr-1" />
-                            {new Date(course.startDate).toLocaleDateString()}
+                  {dashboardData.courses.slice(0, 3).map((course) => {
+                    const courseId = course.id || course._id || course.course_id
+                    return (
+                      <Link key={courseId} href={`/dashboard/courses/${courseId}`}>
+                        <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <div className="flex-1">
+                            <h3 className="font-medium text-teachgage-blue">{course.title || course.name}</h3>
+                            <p className="text-sm text-teachgage-navy">{course.code}</p>
+                            <div className="flex items-center mt-2 text-sm text-teachgage-navy">
+                              <Users className="w-4 h-4 mr-1" />
+                              {course.currentStudents || course.enrollment_count || 0}/{course.maxStudents || course.max_students || 30} students
+                              <Calendar className="w-4 h-4 ml-4 mr-1" />
+                              {course.startDate ? new Date(course.startDate).toLocaleDateString() : 'TBD'}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              course.status === 'active' 
+                                ? 'bg-teachgage-green text-white'
+                                : course.status === 'draft'
+                                  ? 'bg-gray-100 text-teachgage-navy'
+                                  : 'bg-teachgage-orange text-white'
+                            }`}>
+                              {course.status}
+                            </span>
+                            <div className="p-1 text-teachgage-navy hover:text-teachgage-blue">
+                              <ArrowRight className="w-4 h-4" />
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            course.status === 'active' 
-                              ? 'bg-teachgage-green text-white'
-                              : course.status === 'draft'
-                                ? 'bg-gray-100 text-teachgage-navy'
-                                : 'bg-teachgage-orange text-white'
-                          }`}>
-                            {course.status}
-                          </span>
-                          <div className="p-1 text-teachgage-navy hover:text-teachgage-blue">
-                            <ArrowRight className="w-4 h-4" />
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    )
+                  })}
                   
                   {dashboardData.courses.length > 3 && (
                     <div className="text-center pt-4">
@@ -352,8 +352,10 @@ export default function InstructorDashboard({ onCreateCourse, onCreateSurvey }) 
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {dashboardData.surveys.slice(0, 3).map((survey) => (
-                    <Link key={survey.id} href={`/dashboard/feedback-forms/${survey.id}`}>
+                  {dashboardData.surveys.slice(0, 3).map((survey) => {
+                    const surveyId = survey.id || survey._id
+                    return (
+                    <Link key={surveyId} href={`/dashboard/feedback-forms/${surveyId}`}>
                       <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
                         <div className="flex-1">
                           <h3 className="font-medium text-teachgage-blue">{survey.title}</h3>
@@ -381,7 +383,7 @@ export default function InstructorDashboard({ onCreateCourse, onCreateSurvey }) 
                         </div>
                       </div>
                     </Link>
-                  ))}
+                  )})}
                   
                   {dashboardData.surveys.length > 3 && (
                     <div className="text-center pt-4">

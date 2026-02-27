@@ -4,12 +4,7 @@ import Head from 'next/head'
 import DashboardLayout from '../../../../components/layout/DashboardLayout'
 import Breadcrumb from '../../../../components/common/Breadcrumb'
 import { useAuth } from '../../../../contexts/AuthContext'
-import { 
-  demoDepartments,
-  demoUsers,
-  demoCourses,
-  demoOrganizations
-} from '../../../../data/demoData'
+import { organizationAPI, departmentAPI, courseAPI, userAPI } from '../../../../utils/api'
 import { 
   Building,
   Users,
@@ -50,35 +45,39 @@ export default function DepartmentDetailPage() {
     }
   }, [id, user, isAuthenticated, isLoading, router])
 
-  const loadDepartmentData = () => {
+  const loadDepartmentData = async () => {
     try {
-      // Get department details
-      const deptData = demoDepartments.find(dept => 
-        dept.id === id && dept.organizationId === user.organizationId
-      )
-      
-      if (!deptData) {
-        router.push('/dashboard/organization/departments')
-        return
+      const [deptRes, orgRes, usersRes, coursesRes] = await Promise.allSettled([
+        departmentAPI.getDepartment(id),
+        organizationAPI.getOrganization(user.organizationId),
+        userAPI.getUsers({ departmentId: id, organizationId: user.organizationId }),
+        courseAPI.getCourses({ departmentId: id, organizationId: user.organizationId }),
+      ]);
+
+      if (deptRes.status === 'fulfilled') {
+        const deptData = deptRes.value.data?.data || deptRes.value.data;
+        if (!deptData) {
+          router.push('/dashboard/organization/departments');
+          return;
+        }
+        setDepartment({ ...deptData, id: deptData.id || deptData._id });
+      } else {
+        router.push('/dashboard/organization/departments');
+        return;
       }
-      
-      setDepartment(deptData)
 
-      // Get organization details
-      const orgData = demoOrganizations.find(org => org.id === user.organizationId)
-      setOrganization(orgData)
+      const orgData = orgRes.status === 'fulfilled' ? (orgRes.value.data?.data || orgRes.value.data) : null;
+      setOrganization(orgData);
 
-      // Get department users
-      const deptUsers = demoUsers.organizationInstructors.filter(
-        instructor => instructor.departmentId === id && instructor.organizationId === user.organizationId
-      )
-      setDepartmentUsers(deptUsers)
+      const users = usersRes.status === 'fulfilled'
+        ? (usersRes.value.data?.data?.users || usersRes.value.data?.data || usersRes.value.data?.users || [])
+        : [];
+      setDepartmentUsers(users.map(u => ({ ...u, id: u.id || u._id })));
 
-      // Get department courses
-      const deptCourses = demoCourses.filter(
-        course => course.departmentId === id && course.organizationId === user.organizationId
-      )
-      setDepartmentCourses(deptCourses)
+      const courses = coursesRes.status === 'fulfilled'
+        ? (coursesRes.value.data?.data?.courses || coursesRes.value.data?.data || coursesRes.value.data?.courses || [])
+        : [];
+      setDepartmentCourses(courses.map(c => ({ ...c, id: c.id || c._id })));
     } catch (error) {
       console.error('Failed to load department data:', error)
     } finally {

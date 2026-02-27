@@ -3,14 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../contexts/AuthContext';
-import { 
-  demoUsers, 
-  demoOrganizations, 
-  demoDepartments, 
-  demoCourses,
-  demoAnalytics,
-  getTrialDaysRemaining
-} from '../../data/demoData';
+import { organizationAPI, departmentAPI, courseAPI, userAPI } from '../../utils/api';
 import { 
   Users, 
   BookOpen, 
@@ -44,45 +37,50 @@ export default function OrganizationDashboard({ onCreateInstructor, onBulkUpload
 
   // Load organization data
   useEffect(() => {
-    const loadOrganizationData = () => {
+    const loadOrganizationData = async () => {
       if (!user?.organizationId) return;
 
       setIsLoading(true);
 
       try {
-        // Get organization details
-        const orgData = demoOrganizations.find(org => org.id === user.organizationId);
+        const [orgRes, deptsRes, coursesRes, usersRes] = await Promise.allSettled([
+          organizationAPI.getOrganization(user.organizationId),
+          departmentAPI.getDepartments({ organizationId: user.organizationId }),
+          courseAPI.getCourses({ organizationId: user.organizationId }),
+          userAPI.getUsers({ organizationId: user.organizationId }),
+        ]);
+
+        const orgData = orgRes.status === 'fulfilled'
+          ? (orgRes.value.data?.data || orgRes.value.data)
+          : null;
         setOrganization(orgData);
 
-        // Get organization instructors
-        const orgInstructors = demoUsers.organizationInstructors.filter(
-          instructor => instructor.organizationId === user.organizationId
-        );
-        setInstructors(orgInstructors);
-
-        // Get organization departments
-        const orgDepartments = demoDepartments.filter(
-          dept => dept.organizationId === user.organizationId
-        );
+        const orgDepartments = deptsRes.status === 'fulfilled'
+          ? (deptsRes.value.data?.data?.departments || deptsRes.value.data?.data || deptsRes.value.data?.departments || [])
+          : [];
         setDepartments(orgDepartments);
 
-        // Get organization courses
-        const orgCourses = demoCourses.filter(
-          course => course.organizationId === user.organizationId
-        );
+        const orgCourses = coursesRes.status === 'fulfilled'
+          ? (coursesRes.value.data?.data?.courses || coursesRes.value.data?.data || coursesRes.value.data?.courses || [])
+          : [];
         setCourses(orgCourses);
 
-        // Get analytics
-        const orgAnalytics = demoAnalytics.organizationDashboard[user.organizationId] || {
+        const orgInstructors = usersRes.status === 'fulfilled'
+          ? (usersRes.value.data?.data?.users || usersRes.value.data?.data || usersRes.value.data?.users || [])
+          : [];
+        setInstructors(orgInstructors);
+
+        // Build analytics from fetched data
+        const orgAnalytics = {
           totalInstructors: orgInstructors.length,
           totalCourses: orgCourses.length,
           activeSurveys: 0,
           totalResponses: 0,
           departmentBreakdown: orgDepartments.map(dept => ({
-            departmentId: dept.id,
+            departmentId: dept.id || dept._id,
             name: dept.name,
-            instructors: orgInstructors.filter(i => i.departmentId === dept.id).length,
-            courses: orgCourses.filter(c => c.departmentId === dept.id).length,
+            instructors: orgInstructors.filter(i => i.departmentId === (dept.id || dept._id)).length,
+            courses: orgCourses.filter(c => c.departmentId === (dept.id || dept._id)).length,
             surveys: 0
           }))
         };

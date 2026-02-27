@@ -16,6 +16,7 @@ import {
   Calendar,
   Award
 } from 'lucide-react'
+import { analyticsAPI, departmentAPI } from '../../../utils/api'
 
 export default function OrganizationDashboard() {
   const router = useRouter()
@@ -27,25 +28,37 @@ export default function OrganizationDashboard() {
   })
   const [loading, setLoading] = useState(true)
 
+  const [recentActivities, setRecentActivities] = useState([])
+  const [departmentStats, setDepartmentStats] = useState([])
+
   useEffect(() => {
-    // Simulate API call for organization stats
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
-        // Demo data for organization admin
-        setStats({
-          totalUsers: 156,
-          totalDepartments: 8,
-          activeCourses: 34,
-          completedSurveys: 89
-        })
+        const [statsRes, deptRes] = await Promise.allSettled([
+          analyticsAPI.getDashboardStats(),
+          departmentAPI.getDepartments()
+        ])
+        if (statsRes.status === 'fulfilled') {
+          const data = statsRes.value.data?.data || statsRes.value.data || {}
+          setStats({
+            totalUsers: data.totalUsers || 0,
+            totalDepartments: data.totalDepartments || 0,
+            activeCourses: data.activeCourses || 0,
+            completedSurveys: data.completedSurveys || 0
+          })
+          setRecentActivities(data.recentActivity || [])
+        }
+        if (deptRes.status === 'fulfilled') {
+          const depts = deptRes.value.data?.data || deptRes.value.data || []
+          setDepartmentStats(Array.isArray(depts) ? depts : depts.departments || [])
+        }
       } catch (error) {
         console.error('Error fetching organization stats:', error)
       } finally {
         setLoading(false)
       }
     }
-
-    fetchStats()
+    fetchData()
   }, [])
 
   // Navigation handlers
@@ -89,82 +102,27 @@ export default function OrganizationDashboard() {
     {
       name: 'Total Users',
       value: stats.totalUsers,
-      change: '+15%',
-      changeType: 'positive',
       icon: Users,
       color: 'bg-blue-500'
     },
     {
       name: 'Departments',
       value: stats.totalDepartments,
-      change: '+2',
-      changeType: 'positive',
       icon: Building2,
       color: 'bg-green-500'
     },
     {
       name: 'Active Courses',
       value: stats.activeCourses,
-      change: '+12%',
-      changeType: 'positive',
       icon: GraduationCap,
       color: 'bg-purple-500'
     },
     {
       name: 'Completed Surveys',
       value: stats.completedSurveys,
-      change: '+28%',
-      changeType: 'positive',
       icon: BarChart3,
       color: 'bg-orange-500'
     }
-  ]
-
-  const recentActivities = [
-    {
-      id: 1,
-      action: 'New Department Created',
-      details: 'Computer Science Department added',
-      user: 'Org Admin',
-      time: '15 minutes ago',
-      icon: Building2,
-      color: 'text-blue-600'
-    },
-    {
-      id: 2,
-      action: 'Bulk User Import',
-      details: '25 new instructors added to Engineering',
-      user: 'System',
-      time: '1 hour ago',
-      icon: Users,
-      color: 'text-green-600'
-    },
-    {
-      id: 3,
-      action: 'Survey Completed',
-      details: 'Mid-semester evaluation for CS101',
-      user: 'Dr. Smith',
-      time: '2 hours ago',
-      icon: Award,
-      color: 'text-purple-600'
-    },
-    {
-      id: 4,
-      action: 'Course Created',
-      details: 'Advanced Machine Learning - Fall 2024',
-      user: 'Prof. Johnson',
-      time: '3 hours ago',
-      icon: GraduationCap,
-      color: 'text-orange-600'
-    }
-  ]
-
-  const departmentStats = [
-    { name: 'Computer Science', users: 45, courses: 12, completion: 92 },
-    { name: 'Engineering', users: 38, courses: 8, completion: 87 },
-    { name: 'Mathematics', users: 32, courses: 15, completion: 95 },
-    { name: 'Physics', users: 28, courses: 10, completion: 89 },
-    { name: 'Business', users: 13, courses: 6, completion: 78 }
   ]
 
   if (loading) {
@@ -204,19 +162,6 @@ export default function OrganizationDashboard() {
                     <IconComponent className="h-6 w-6 text-white" />
                   </div>
                 </div>
-                <div className="mt-4 flex items-center">
-                  <span className={`text-sm font-medium ${
-                    metric.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {metric.changeType === 'positive' ? (
-                      <TrendingUp className="h-4 w-4 inline mr-1" />
-                    ) : (
-                      <TrendingDown className="h-4 w-4 inline mr-1" />
-                    )}
-                    {metric.change}
-                  </span>
-                  <span className="text-sm text-gray-500 ml-2">vs last month</span>
-                </div>
               </div>
             )
           })}
@@ -230,26 +175,21 @@ export default function OrganizationDashboard() {
               <Building2 className="h-5 w-5 text-gray-400" />
             </div>
             <div className="space-y-4">
-              {departmentStats.map((dept, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              {departmentStats.length > 0 ? departmentStats.map((dept, index) => (
+                <div key={dept._id || dept.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-gray-900">{dept.name}</span>
-                      <span className="text-sm text-gray-600">{dept.completion}%</span>
                     </div>
                     <div className="flex items-center text-xs text-gray-500 space-x-4">
-                      <span>{dept.users} users</span>
-                      <span>{dept.courses} courses</span>
-                    </div>
-                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-teachgage-blue h-2 rounded-full" 
-                        style={{ width: `${dept.completion}%` }}
-                      ></div>
+                      <span>{dept.userCount || dept.members?.length || 0} users</span>
+                      <span>{dept.courseCount || 0} courses</span>
                     </div>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <p className="text-sm text-gray-500 text-center py-4">No department data available</p>
+              )}
             </div>
           </div>
 
@@ -260,25 +200,22 @@ export default function OrganizationDashboard() {
               <Calendar className="h-5 w-5 text-gray-400" />
             </div>
             <div className="space-y-4">
-              {recentActivities.map((activity) => {
-                const IconComponent = activity.icon
-                return (
-                  <div key={activity.id} className="flex items-start space-x-3">
-                    <div className={`p-2 rounded-full bg-gray-100`}>
-                      <IconComponent className={`h-4 w-4 ${activity.color}`} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                      <p className="text-sm text-gray-600">{activity.details}</p>
-                      <div className="flex items-center mt-1 text-xs text-gray-500">
-                        <span>By {activity.user}</span>
-                        <span className="mx-2">•</span>
-                        <span>{activity.time}</span>
-                      </div>
+              {recentActivities.length > 0 ? recentActivities.map((activity, index) => (
+                <div key={activity.id || activity._id || index} className="flex items-start space-x-3">
+                  <div className="p-2 rounded-full bg-gray-100">
+                    <Calendar className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">{activity.action || activity.title || 'Activity'}</p>
+                    <p className="text-sm text-gray-600">{activity.details || activity.description || ''}</p>
+                    <div className="flex items-center mt-1 text-xs text-gray-500">
+                      <span>{activity.time || (activity.createdAt ? new Date(activity.createdAt).toLocaleString() : '')}</span>
                     </div>
                   </div>
-                )
-              })}
+                </div>
+              )) : (
+                <p className="text-sm text-gray-500 text-center py-4">No recent activity</p>
+              )}
             </div>
           </div>
         </div>
@@ -332,7 +269,7 @@ export default function OrganizationDashboard() {
                 <Users className="h-6 w-6 text-blue-600" />
               </div>
               <h4 className="text-sm font-medium text-gray-900">User Limit</h4>
-              <p className="text-sm text-gray-600">156 / 200 users</p>
+              <p className="text-sm text-gray-600">{stats.totalUsers} users</p>
               <p className="text-xs text-blue-600 mt-1">78% utilized</p>
             </div>
             <div className="text-center">

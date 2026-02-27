@@ -22,6 +22,7 @@ import {
   X
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { userAPI } from '../../../utils/api'
 
 export default function PlatformUsersPage() {
   const router = useRouter()
@@ -74,87 +75,9 @@ export default function PlatformUsersPage() {
 
   const fetchUsers = async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      const mockUsers = [
-        {
-          id: 'user_1',
-          firstName: 'John',
-          lastName: 'Smith',
-          email: 'john.smith@stanford.edu',
-          role: 'instructor',
-          status: 'active',
-          organizationId: 'org_1',
-          organizationName: 'Stanford University',
-          departmentName: 'Computer Science',
-          lastLogin: '2024-01-18T10:30:00Z',
-          createdAt: '2023-08-15',
-          courseCount: 3,
-          surveyCount: 8
-        },
-        {
-          id: 'user_2',
-          firstName: 'Sarah',
-          lastName: 'Johnson',
-          email: 'sarah.johnson@mit.edu',
-          role: 'organization_admin',
-          status: 'active',
-          organizationId: 'org_2',
-          organizationName: 'MIT',
-          departmentName: null,
-          lastLogin: '2024-01-17T14:20:00Z',
-          createdAt: '2023-09-22',
-          courseCount: 0,
-          surveyCount: 0
-        },
-        {
-          id: 'user_3',
-          firstName: 'Michael',
-          lastName: 'Brown',
-          email: 'michael.brown@techcorp.com',
-          role: 'instructor',
-          status: 'active',
-          organizationId: 'org_3',
-          organizationName: 'TechCorp Training',
-          departmentName: 'Engineering',
-          lastLogin: '2024-01-16T09:45:00Z',
-          createdAt: '2023-11-10',
-          courseCount: 2,
-          surveyCount: 5
-        },
-        {
-          id: 'user_4',
-          firstName: 'Emily',
-          lastName: 'Davis',
-          email: 'emily.davis@freelance.com',
-          role: 'instructor',
-          status: 'active',
-          organizationId: null,
-          organizationName: 'Individual Account',
-          departmentName: null,
-          lastLogin: '2024-01-15T16:30:00Z',
-          createdAt: '2024-01-05',
-          courseCount: 1,
-          surveyCount: 2
-        },
-        {
-          id: 'user_5',
-          firstName: 'David',
-          lastName: 'Wilson',
-          email: 'david.wilson@ccd.edu',
-          role: 'instructor',
-          status: 'pending',
-          organizationId: 'org_4',
-          organizationName: 'Community College District',
-          departmentName: 'Mathematics',
-          lastLogin: null,
-          createdAt: '2024-01-10',
-          courseCount: 0,
-          surveyCount: 0
-        }
-      ]
-      
-      setUsers(mockUsers)
+      const response = await userAPI.getUsers()
+      const data = response.data?.data || response.data || []
+      setUsers(Array.isArray(data) ? data : data.users || [])
     } catch (error) {
       console.error('Error fetching users:', error)
       toast.error('Failed to load users')
@@ -569,14 +492,14 @@ function BulkImportModal({ onClose, onSuccess }) {
     setUploading(true)
 
     try {
-      // Simulate upload
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
+      const formData = new FormData()
+      formData.append('file', file)
+      await userAPI.batchImportInstructors(formData)
       toast.success('Users imported successfully!')
       onSuccess()
     } catch (error) {
       console.error('Upload error:', error)
-      toast.error('Failed to import users. Please try again.')
+      toast.error(error.response?.data?.message || 'Failed to import users. Please try again.')
     } finally {
       setUploading(false)
     }

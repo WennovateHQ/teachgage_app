@@ -295,6 +295,107 @@ function renderQuestionInput(question, value, onChange) {
         </div>
       )
 
+    case 'nps':
+      return (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-gray-600">{question.scale?.leftLabel || 'Not at all likely'}</span>
+            <span className="text-sm text-gray-600">{question.scale?.rightLabel || 'Extremely likely'}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            {Array.from({ length: 11 }, (_, i) => {
+              const npsColors = i <= 6 ? 'border-red-300 peer-checked:bg-red-500' : i <= 8 ? 'border-yellow-300 peer-checked:bg-yellow-500' : 'border-green-300 peer-checked:bg-green-500'
+              return (
+                <label key={i} className="flex flex-col items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name={question.id}
+                    value={i}
+                    checked={value === i}
+                    onChange={(e) => onChange(parseInt(e.target.value))}
+                    className="peer sr-only"
+                  />
+                  <span className={`w-8 h-8 flex items-center justify-center rounded-lg border-2 text-sm font-medium transition-colors
+                    ${value === i 
+                      ? (i <= 6 ? 'bg-red-500 border-red-500 text-white' : i <= 8 ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-green-500 border-green-500 text-white')
+                      : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                    }`}>
+                    {i}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+          <div className="flex justify-between mt-2 text-xs text-gray-500">
+            <span>Detractors (0-6)</span>
+            <span>Passives (7-8)</span>
+            <span>Promoters (9-10)</span>
+          </div>
+        </div>
+      )
+
+    case 'demographic':
+      return (
+        <div>
+          {question.demographicType === 'age' ? (
+            <select
+              value={value || ''}
+              onChange={(e) => onChange(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
+            >
+              <option value="">Select age range...</option>
+              <option value="under_18">Under 18</option>
+              <option value="18_24">18-24</option>
+              <option value="25_34">25-34</option>
+              <option value="35_44">35-44</option>
+              <option value="45_54">45-54</option>
+              <option value="55_64">55-64</option>
+              <option value="65_plus">65+</option>
+              <option value="prefer_not">Prefer not to say</option>
+            </select>
+          ) : question.demographicType === 'gender' ? (
+            <select
+              value={value || ''}
+              onChange={(e) => onChange(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
+            >
+              <option value="">Select gender...</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="non_binary">Non-binary</option>
+              <option value="other">Other</option>
+              <option value="prefer_not">Prefer not to say</option>
+            </select>
+          ) : question.demographicType === 'education' ? (
+            <select
+              value={value || ''}
+              onChange={(e) => onChange(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
+            >
+              <option value="">Select education level...</option>
+              <option value="high_school">High School</option>
+              <option value="associate">Associate Degree</option>
+              <option value="bachelor">Bachelor's Degree</option>
+              <option value="master">Master's Degree</option>
+              <option value="doctorate">Doctorate</option>
+              <option value="other">Other</option>
+              <option value="prefer_not">Prefer not to say</option>
+            </select>
+          ) : (
+            <select
+              value={value || ''}
+              onChange={(e) => onChange(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
+            >
+              <option value="">{question.placeholder || 'Select...'}</option>
+              {(question.options || []).map((option, index) => (
+                <option key={index} value={option}>{option}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      )
+
     default:
       return (
         <div className="text-center py-4 text-gray-500">

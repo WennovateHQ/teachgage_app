@@ -22,6 +22,7 @@ import {
   Settings
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { organizationAPI } from '../../../../utils/api'
 
 export default function OrganizationDetailPage() {
   const router = useRouter()
@@ -38,83 +39,9 @@ export default function OrganizationDetailPage() {
 
   const fetchOrganizationDetails = async () => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Mock organization data with comprehensive details
-      const mockOrganization = {
-        id: id,
-        name: 'Stanford University',
-        type: 'academic',
-        subscriptionTier: 'enterprise',
-        status: 'active',
-        userCount: 245,
-        maxUsers: 500,
-        departmentCount: 12,
-        courseCount: 89,
-        surveyCount: 156,
-        createdAt: '2023-08-15',
-        lastActivity: '2024-01-18T10:30:00Z',
-        trialEndsAt: null, // Enterprise doesn't have trial
-        contactInfo: {
-          email: 'admin@stanford.edu',
-          phone: '+1-650-723-2300',
-          website: 'https://stanford.edu'
-        },
-        address: {
-          street: '450 Serra Mall',
-          city: 'Stanford',
-          state: 'CA',
-          zipCode: '94305',
-          country: 'US'
-        },
-        billing: {
-          plan: 'Enterprise',
-          monthlyRevenue: 2990,
-          nextBillingDate: '2024-02-15',
-          paymentMethod: 'Credit Card ****1234'
-        },
-        stats: {
-          totalUsers: 245,
-          activeUsers: 198,
-          totalCourses: 89,
-          activeCourses: 67,
-          totalSurveys: 156,
-          completedSurveys: 134,
-          responseRate: 87.5
-        },
-        recentActivity: [
-          {
-            id: 1,
-            type: 'user_created',
-            description: 'New instructor John Smith added to Computer Science department',
-            timestamp: '2024-01-18T10:30:00Z',
-            user: 'Admin'
-          },
-          {
-            id: 2,
-            type: 'course_created',
-            description: 'Course "Advanced Machine Learning" created',
-            timestamp: '2024-01-17T14:20:00Z',
-            user: 'Prof. Johnson'
-          },
-          {
-            id: 3,
-            type: 'survey_completed',
-            description: 'Survey "Course Evaluation - CS101" completed by 45 students',
-            timestamp: '2024-01-16T09:45:00Z',
-            user: 'System'
-          }
-        ],
-        departments: [
-          { id: 1, name: 'Computer Science', userCount: 45, courseCount: 23 },
-          { id: 2, name: 'Mathematics', userCount: 32, courseCount: 18 },
-          { id: 3, name: 'Physics', userCount: 28, courseCount: 15 },
-          { id: 4, name: 'Engineering', userCount: 67, courseCount: 33 }
-        ]
-      }
-      
-      setOrganization(mockOrganization)
+      const response = await organizationAPI.getOrganization(id)
+      const data = response.data?.data || response.data || null
+      setOrganization(data)
     } catch (error) {
       console.error('Error fetching organization details:', error)
       toast.error('Failed to load organization details')
@@ -127,24 +54,41 @@ export default function OrganizationDetailPage() {
     router.push(`/admin/platform/organizations/${id}/edit`)
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm('Are you sure you want to delete this organization? This action cannot be undone.')) {
-      // Simulate delete
-      toast.success('Organization deleted successfully')
-      router.push('/admin/platform/organizations')
+      try {
+        await organizationAPI.deleteOrganization(id)
+        toast.success('Organization deleted successfully')
+        router.push('/admin/platform/organizations')
+      } catch (error) {
+        console.error('Delete error:', error)
+        toast.error(error.response?.data?.message || 'Failed to delete organization')
+      }
     }
   }
 
-  const handleSuspend = () => {
+  const handleSuspend = async () => {
     if (confirm('Are you sure you want to suspend this organization?')) {
-      setOrganization(prev => ({ ...prev, status: 'suspended' }))
-      toast.success('Organization suspended successfully')
+      try {
+        await organizationAPI.updateOrganization(id, { status: 'suspended' })
+        setOrganization(prev => ({ ...prev, status: 'suspended' }))
+        toast.success('Organization suspended successfully')
+      } catch (error) {
+        console.error('Suspend error:', error)
+        toast.error(error.response?.data?.message || 'Failed to suspend organization')
+      }
     }
   }
 
-  const handleActivate = () => {
-    setOrganization(prev => ({ ...prev, status: 'active' }))
-    toast.success('Organization activated successfully')
+  const handleActivate = async () => {
+    try {
+      await organizationAPI.updateOrganization(id, { status: 'active' })
+      setOrganization(prev => ({ ...prev, status: 'active' }))
+      toast.success('Organization activated successfully')
+    } catch (error) {
+      console.error('Activate error:', error)
+      toast.error(error.response?.data?.message || 'Failed to activate organization')
+    }
   }
 
   const getStatusBadge = (status) => {

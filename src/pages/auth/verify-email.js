@@ -31,20 +31,20 @@ export default function VerifyEmailPage() {
 
   const verifyEmail = async () => {
     try {
-      const response = await fetch('/api/auth/verify-email', {
-        method: 'POST',
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/auth/verify/${token}`, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token }),
       })
 
       const data = await response.json()
 
-      if (response.ok) {
+      if (response.ok && data.success) {
         setIsVerified(true)
       } else {
-        setError(data.message || 'Email verification failed')
+        setError(data.message || data.error?.message || 'Email verification failed')
       }
     } catch (error) {
       console.error('Email verification error:', error)
@@ -64,7 +64,8 @@ export default function VerifyEmailPage() {
     setResendMessage('')
 
     try {
-      const response = await fetch('/api/auth/resend-verification', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/auth/resend-verification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -74,10 +75,10 @@ export default function VerifyEmailPage() {
 
       const data = await response.json()
 
-      if (response.ok) {
+      if (response.ok && data.success) {
         setResendMessage('Verification email sent successfully! Please check your inbox.')
       } else {
-        setResendMessage(data.message || 'Failed to resend verification email')
+        setResendMessage(data.message || data.error?.message || 'Failed to resend verification email')
       }
     } catch (error) {
       console.error('Resend verification error:', error)

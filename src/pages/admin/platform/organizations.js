@@ -17,6 +17,7 @@ import {
   Eye
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { organizationAPI } from '../../../utils/api'
 
 export default function OrganizationsPage() {
   const router = useRouter()
@@ -28,108 +29,13 @@ export default function OrganizationsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
 
   useEffect(() => {
-    // Simulate API call to fetch organizations
     const fetchOrganizations = async () => {
       try {
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        const mockOrganizations = [
-          {
-            id: 'org_1',
-            name: 'Stanford University',
-            type: 'academic',
-            subscriptionTier: 'enterprise',
-            status: 'active',
-            userCount: 245,
-            maxUsers: 500,
-            departmentCount: 12,
-            createdAt: '2023-08-15',
-            lastActivity: '2024-01-18T10:30:00Z',
-            contactInfo: {
-              email: 'admin@stanford.edu',
-              phone: '+1-650-723-2300'
-            },
-            address: {
-              street: '450 Serra Mall',
-              city: 'Stanford',
-              state: 'CA',
-              zipCode: '94305',
-              country: 'US'
-            }
-          },
-          {
-            id: 'org_2',
-            name: 'MIT',
-            type: 'academic',
-            subscriptionTier: 'enterprise',
-            status: 'active',
-            userCount: 189,
-            maxUsers: 300,
-            departmentCount: 8,
-            createdAt: '2023-09-22',
-            lastActivity: '2024-01-17T14:20:00Z',
-            contactInfo: {
-              email: 'admin@mit.edu',
-              phone: '+1-617-253-1000'
-            },
-            address: {
-              street: '77 Massachusetts Ave',
-              city: 'Cambridge',
-              state: 'MA',
-              zipCode: '02139',
-              country: 'US'
-            }
-          },
-          {
-            id: 'org_3',
-            name: 'TechCorp Training',
-            type: 'corporate',
-            subscriptionTier: 'professional',
-            status: 'active',
-            userCount: 78,
-            maxUsers: 100,
-            departmentCount: 4,
-            createdAt: '2023-11-10',
-            lastActivity: '2024-01-16T09:45:00Z',
-            contactInfo: {
-              email: 'training@techcorp.com',
-              phone: '+1-555-0123'
-            },
-            address: {
-              street: '123 Business Ave',
-              city: 'San Francisco',
-              state: 'CA',
-              zipCode: '94105',
-              country: 'US'
-            }
-          },
-          {
-            id: 'org_4',
-            name: 'Community College District',
-            type: 'academic',
-            subscriptionTier: 'basic',
-            status: 'trial',
-            userCount: 34,
-            maxUsers: 50,
-            departmentCount: 3,
-            createdAt: '2024-01-05',
-            lastActivity: '2024-01-15T16:30:00Z',
-            contactInfo: {
-              email: 'admin@ccd.edu',
-              phone: '+1-555-0456'
-            },
-            address: {
-              street: '789 Education Blvd',
-              city: 'Sacramento',
-              state: 'CA',
-              zipCode: '95814',
-              country: 'US'
-            }
-          }
-        ]
-        
-        setOrganizations(mockOrganizations)
-        setFilteredOrganizations(mockOrganizations)
+        const response = await organizationAPI.getOrganizations()
+        const data = response.data?.data || response.data || []
+        const orgs = Array.isArray(data) ? data : data.organizations || []
+        setOrganizations(orgs)
+        setFilteredOrganizations(orgs)
       } catch (error) {
         console.error('Error fetching organizations:', error)
         toast.error('Failed to load organizations')
@@ -137,7 +43,6 @@ export default function OrganizationsPage() {
         setLoading(false)
       }
     }
-
     fetchOrganizations()
   }, [])
 
@@ -188,10 +93,16 @@ export default function OrganizationsPage() {
     router.push(`/admin/platform/organizations/${orgId}/edit`)
   }
 
-  const handleDeleteOrganization = (orgId) => {
+  const handleDeleteOrganization = async (orgId) => {
     if (confirm('Are you sure you want to delete this organization?')) {
-      setOrganizations(prev => prev.filter(org => org.id !== orgId))
-      toast.success('Organization deleted successfully')
+      try {
+        await organizationAPI.deleteOrganization(orgId)
+        setOrganizations(prev => prev.filter(org => (org.id || org._id) !== orgId))
+        toast.success('Organization deleted successfully')
+      } catch (error) {
+        console.error('Error deleting organization:', error)
+        toast.error(error.response?.data?.message || 'Failed to delete organization')
+      }
     }
   }
 

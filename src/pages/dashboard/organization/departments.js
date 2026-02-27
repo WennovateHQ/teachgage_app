@@ -4,12 +4,7 @@ import Head from 'next/head'
 import DashboardLayout from '../../../components/layout/DashboardLayout'
 import Breadcrumb from '../../../components/common/Breadcrumb'
 import { useAuth } from '../../../contexts/AuthContext'
-import { 
-  demoUsers, 
-  demoDepartments,
-  demoOrganizations,
-  demoCourses
-} from '../../../data/demoData'
+import { organizationAPI, departmentAPI, courseAPI, userAPI } from '../../../utils/api'
 import { 
   Building, 
   Users, 
@@ -50,29 +45,32 @@ export default function OrganizationDepartmentsPage() {
     }
   }, [user, isAuthenticated, isLoading, router])
 
-  const loadOrganizationData = () => {
+  const loadOrganizationData = async () => {
     try {
-      // Get organization details
-      const orgData = demoOrganizations.find(org => org.id === user.organizationId)
-      setOrganization(orgData)
+      const [orgRes, deptsRes, usersRes, coursesRes] = await Promise.allSettled([
+        organizationAPI.getOrganization(user.organizationId),
+        departmentAPI.getDepartments({ organizationId: user.organizationId }),
+        userAPI.getUsers({ organizationId: user.organizationId }),
+        courseAPI.getCourses({ organizationId: user.organizationId }),
+      ]);
 
-      // Get organization departments
-      const orgDepartments = demoDepartments.filter(
-        dept => dept.organizationId === user.organizationId
-      )
-      setDepartments(orgDepartments)
+      const orgData = orgRes.status === 'fulfilled' ? (orgRes.value.data?.data || orgRes.value.data) : null;
+      setOrganization(orgData);
 
-      // Get organization instructors
-      const orgInstructors = demoUsers.organizationInstructors.filter(
-        instructor => instructor.organizationId === user.organizationId
-      )
-      setInstructors(orgInstructors)
+      const depts = deptsRes.status === 'fulfilled'
+        ? (deptsRes.value.data?.data?.departments || deptsRes.value.data?.data || deptsRes.value.data?.departments || [])
+        : [];
+      setDepartments(depts.map(d => ({ ...d, id: d.id || d._id })));
 
-      // Get organization courses
-      const orgCourses = demoCourses.filter(
-        course => course.organizationId === user.organizationId
-      )
-      setCourses(orgCourses)
+      const users = usersRes.status === 'fulfilled'
+        ? (usersRes.value.data?.data?.users || usersRes.value.data?.data || usersRes.value.data?.users || [])
+        : [];
+      setInstructors(users.map(u => ({ ...u, id: u.id || u._id })));
+
+      const courses = coursesRes.status === 'fulfilled'
+        ? (coursesRes.value.data?.data?.courses || coursesRes.value.data?.data || coursesRes.value.data?.courses || [])
+        : [];
+      setCourses(courses.map(c => ({ ...c, id: c.id || c._id })));
     } catch (error) {
       console.error('Failed to load organization data:', error)
     } finally {

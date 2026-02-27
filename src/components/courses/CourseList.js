@@ -2,11 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  getDemoCoursesByInstructor, 
-  demoCourses, 
-  getDemoSurveysByCourse 
-} from '@/data/demoData';
+import { courseAPI } from '@/utils/api';
 import { 
   BookOpen, 
   Calendar, 
@@ -21,7 +17,8 @@ import {
   BarChart3,
   Clock,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Tag
 } from 'lucide-react';
 
 export default function CourseList({ onCreateCourse, onEditCourse }) {
@@ -30,35 +27,38 @@ export default function CourseList({ onCreateCourse, onEditCourse }) {
   const [filteredCourses, setFilteredCourses] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState('title');
   const [sortOrder, setSortOrder] = useState('asc');
   const [isLoading, setIsLoading] = useState(true);
 
   // Load courses based on user role
   useEffect(() => {
-    const loadCourses = () => {
+    const loadCourses = async () => {
       setIsLoading(true);
       
-      let userCourses = [];
-      
-      if (user?.role === 'organization_admin') {
-        // Organization admin sees all courses in their organization
-        userCourses = demoCourses.filter(course => 
-          course.organizationId === user.organizationId
-        );
-      } else {
-        // Regular instructors see only their courses
-        userCourses = getDemoCoursesByInstructor(user?.id || '');
+      try {
+        const params = {};
+        if (user?.role === 'organization_admin' && user?.organizationId) {
+          params.organizationId = user.organizationId;
+        }
+
+        const response = await courseAPI.getCourses(params);
+        const coursesData = response.data?.data?.courses || response.data?.data || response.data?.courses || [];
+
+        const coursesWithDefaults = coursesData.map(course => ({
+          ...course,
+          id: course.id || course._id,
+          surveyCount: course.surveyCount || 0
+        }));
+
+        setCourses(coursesWithDefaults);
+      } catch (error) {
+        console.error('Failed to load courses:', error);
+        setCourses([]);
+      } finally {
+        setIsLoading(false);
       }
-
-      // Add survey count to each course
-      const coursesWithSurveys = userCourses.map(course => ({
-        ...course,
-        surveyCount: getDemoSurveysByCourse(course.id).length
-      }));
-
-      setCourses(coursesWithSurveys);
-      setIsLoading(false);
     };
 
     if (user) {
@@ -84,6 +84,11 @@ export default function CourseList({ onCreateCourse, onEditCourse }) {
       filtered = filtered.filter(course => course.status === statusFilter);
     }
 
+    // Apply category filter
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(course => course.category === categoryFilter);
+    }
+
     // Apply sorting
     filtered.sort((a, b) => {
       let aValue = a[sortBy];
@@ -107,7 +112,22 @@ export default function CourseList({ onCreateCourse, onEditCourse }) {
     });
 
     setFilteredCourses(filtered);
-  }, [courses, searchTerm, statusFilter, sortBy, sortOrder]);
+  }, [courses, searchTerm, statusFilter, categoryFilter, sortBy, sortOrder]);
+
+  const CATEGORY_LABELS = {
+    mathematics: 'Mathematics',
+    science: 'Science',
+    technology: 'Technology',
+    engineering: 'Engineering',
+    arts: 'Arts & Humanities',
+    business: 'Business & Management',
+    health: 'Health & Medicine',
+    education: 'Education',
+    social_sciences: 'Social Sciences',
+    vocational: 'Vocational & Technical',
+    coaching: 'Coaching & Development',
+    other: 'Other'
+  };
 
   // Handle course actions
   const handleDuplicateCourse = (course) => {
@@ -227,6 +247,20 @@ export default function CourseList({ onCreateCourse, onEditCourse }) {
             </select>
           </div>
 
+          {/* Category Filter */}
+          <div className="sm:w-48">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Categories</option>
+              {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Sort */}
           <div className="sm:w-48">
             <select
@@ -291,9 +325,27 @@ export default function CourseList({ onCreateCourse, onEditCourse }) {
                     {getStatusBadge(course.status)}
                   </div>
 
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">
                     {course.description}
                   </p>
+
+                  {(course.category || (course.tags && course.tags.length > 0)) && (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {course.category && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                          {CATEGORY_LABELS[course.category] || course.category}
+                        </span>
+                      )}
+                      {course.tags?.slice(0, 3).map((tag, i) => (
+                        <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {tag}
+                        </span>
+                      ))}
+                      {course.tags?.length > 3 && (
+                        <span className="text-xs text-gray-500">+{course.tags.length - 3}</span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Course Stats */}
                   <div className="grid grid-cols-2 gap-4 mb-4">

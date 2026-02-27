@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { courseAPI } from '@/utils/api';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -36,6 +37,11 @@ export default function CourseCreationWizard({ onClose }) {
     // Learning Objectives
     objectives: [''],
     prerequisites: [''],
+    
+    // Categorization
+    category: '',
+    tags: [],
+    tagInput: '',
     
     // Additional Settings
     status: 'draft',
@@ -178,25 +184,30 @@ export default function CourseCreationWizard({ onClose }) {
     setIsSubmitting(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
       // Clean up form data
       const courseData = {
-        ...formData,
+        name: formData.title,
+        code: formData.code,
+        description: formData.description,
         objectives: formData.objectives.filter(obj => obj.trim()),
         prerequisites: formData.prerequisites.filter(req => req.trim()),
-        instructorId: user.id,
-        instructorName: `${user.firstName} ${user.lastName}`,
+        category: formData.category || null,
+        tags: formData.tags || [],
+        instructorId: user.id || user.userId,
         organizationId: user.organizationId || null,
         departmentId: user.departmentId || null,
-        currentStudents: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        startDate: formData.startDate || null,
+        endDate: formData.endDate || null,
+        capacity: formData.maxStudents,
+        status: formData.status || 'draft',
+        allowSelfAllocation: formData.allowSelfEnrollment
       };
 
-      // In a real app, this would call the API
-      console.log('Creating course:', courseData);
+      console.log('Creating course with data:', courseData);
+
+      // Call the actual API
+      const response = await courseAPI.createCourse(courseData);
+      console.log('Course created successfully:', response.data);
 
       // Show success and redirect
       alert('Course created successfully!');
@@ -207,7 +218,8 @@ export default function CourseCreationWizard({ onClose }) {
       }
     } catch (error) {
       console.error('Failed to create course:', error);
-      alert('Failed to create course. Please try again.');
+      const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to create course. Please try again.';
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -382,6 +394,93 @@ export default function CourseCreationWizard({ onClose }) {
                     <p className="mt-1 text-sm text-red-600">{validationErrors.description}</p>
                   )}
                 </div>
+
+                <div className="grid md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+                      Category
+                    </label>
+                    <select
+                      id="category"
+                      name="category"
+                      value={formData.category}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-teachgage-blue"
+                    >
+                      <option value="">Select a category...</option>
+                      <option value="mathematics">Mathematics</option>
+                      <option value="science">Science</option>
+                      <option value="technology">Technology</option>
+                      <option value="engineering">Engineering</option>
+                      <option value="arts">Arts & Humanities</option>
+                      <option value="business">Business & Management</option>
+                      <option value="health">Health & Medicine</option>
+                      <option value="education">Education</option>
+                      <option value="social_sciences">Social Sciences</option>
+                      <option value="vocational">Vocational & Technical</option>
+                      <option value="coaching">Coaching & Development</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tags
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={formData.tagInput}
+                        onChange={(e) => setFormData(prev => ({ ...prev, tagInput: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && formData.tagInput.trim()) {
+                            e.preventDefault();
+                            if (!formData.tags.includes(formData.tagInput.trim())) {
+                              setFormData(prev => ({
+                                ...prev,
+                                tags: [...prev.tags, prev.tagInput.trim()],
+                                tagInput: ''
+                              }));
+                            }
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-teachgage-blue"
+                        placeholder="Type & press Enter..."
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (formData.tagInput.trim() && !formData.tags.includes(formData.tagInput.trim())) {
+                            setFormData(prev => ({
+                              ...prev,
+                              tags: [...prev.tags, prev.tagInput.trim()],
+                              tagInput: ''
+                            }));
+                          }
+                        }}
+                        className="px-3 py-2 bg-teachgage-blue text-white rounded-md hover:bg-teachgage-medium-blue text-sm"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {formData.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {formData.tags.map((tag, i) => (
+                          <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => setFormData(prev => ({ ...prev, tags: prev.tags.filter((_, idx) => idx !== i) }))}
+                              className="ml-1 text-blue-600 hover:text-blue-800"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -432,25 +531,45 @@ export default function CourseCreationWizard({ onClose }) {
                   </div>
                 </div>
 
-                <div className="mt-4">
-                  <label htmlFor="maxStudents" className="block text-sm font-medium text-gray-700 mb-1">
-                    Maximum Students
-                  </label>
-                  <input
-                    type="number"
-                    id="maxStudents"
-                    name="maxStudents"
-                    min="1"
-                    max="500"
-                    value={formData.maxStudents}
-                    onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-teachgage-blue ${
-                      validationErrors.maxStudents ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                  />
-                  {validationErrors.maxStudents && (
-                    <p className="mt-1 text-sm text-red-600">{validationErrors.maxStudents}</p>
-                  )}
+                <div className="grid md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label htmlFor="maxStudents" className="block text-sm font-medium text-gray-700 mb-1">
+                      Maximum Students
+                    </label>
+                    <input
+                      type="number"
+                      id="maxStudents"
+                      name="maxStudents"
+                      min="1"
+                      max="500"
+                      value={formData.maxStudents}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-teachgage-blue ${
+                        validationErrors.maxStudents ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                    />
+                    {validationErrors.maxStudents && (
+                      <p className="mt-1 text-sm text-red-600">{validationErrors.maxStudents}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                      Course Status
+                    </label>
+                    <select
+                      id="status"
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-teachgage-blue"
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="active">Active</option>
+                      <option value="archived">Archived</option>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">Draft courses are not visible to students</p>
+                  </div>
                 </div>
 
                 <div className="mt-4 space-y-3">
@@ -588,6 +707,21 @@ export default function CourseCreationWizard({ onClose }) {
                       <p><strong>Title:</strong> {formData.title}</p>
                       <p><strong>Code:</strong> {formData.code}</p>
                       <p><strong>Description:</strong> {formData.description}</p>
+                      {formData.category && (
+                        <p><strong>Category:</strong> {formData.category.charAt(0).toUpperCase() + formData.category.slice(1).replace('_', ' ')}</p>
+                      )}
+                      {formData.tags.length > 0 && (
+                        <div className="mt-1">
+                          <strong>Tags:</strong>{' '}
+                          <span className="inline-flex flex-wrap gap-1 ml-1">
+                            {formData.tags.map((tag, i) => (
+                              <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {tag}
+                              </span>
+                            ))}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -597,6 +731,7 @@ export default function CourseCreationWizard({ onClose }) {
                       <p><strong>Start Date:</strong> {new Date(formData.startDate).toLocaleDateString()}</p>
                       <p><strong>End Date:</strong> {new Date(formData.endDate).toLocaleDateString()}</p>
                       <p><strong>Maximum Students:</strong> {formData.maxStudents}</p>
+                      <p><strong>Status:</strong> {formData.status?.charAt(0).toUpperCase() + formData.status?.slice(1)}</p>
                       <p><strong>Self-enrollment:</strong> {formData.allowSelfEnrollment ? 'Enabled' : 'Disabled'}</p>
                     </div>
                   </div>

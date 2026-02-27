@@ -15,6 +15,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { analyticsAPI } from '../../../utils/api'
 
 export default function SystemReportsPage() {
   const [loading, setLoading] = useState(true)
@@ -30,71 +31,42 @@ export default function SystemReportsPage() {
   const fetchReportData = async () => {
     setLoading(true)
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const response = await analyticsAPI.getDashboardStats()
+      const data = response.data?.data || response.data || {}
       
-      const mockData = {
+      setReportData({
         overview: {
-          totalUsers: 1247,
-          totalOrganizations: 47,
-          totalCourses: 892,
-          totalSurveys: 2156,
-          activeUsers: 1089,
-          newUsersThisPeriod: 156,
-          growthRate: 12.5,
-          systemUptime: 99.8,
-          averageResponseTime: 245,
-          storageUsed: 2.4,
-          bandwidthUsed: 15.6
+          totalUsers: data.totalUsers || 0,
+          totalOrganizations: data.totalOrganizations || 0,
+          totalCourses: data.totalCourses || 0,
+          totalSurveys: data.totalSurveys || 0,
+          activeUsers: data.activeUsers || 0,
+          newUsersThisPeriod: data.newUsersThisPeriod || 0,
+          growthRate: data.growthRate || 0,
+          systemUptime: data.systemUptime || 0,
+          averageResponseTime: data.averageResponseTime || 0,
+          storageUsed: data.storageUsed || 0,
+          bandwidthUsed: data.bandwidthUsed || 0
         },
-        usage: {
-          dailyActiveUsers: [
-            { date: '2024-01-01', users: 890 },
-            { date: '2024-01-02', users: 920 },
-            { date: '2024-01-03', users: 875 },
-            { date: '2024-01-04', users: 950 },
-            { date: '2024-01-05', users: 980 }
-          ],
-          topOrganizations: [
-            { name: 'Stanford University', users: 245, usage: 85 },
-            { name: 'MIT', users: 189, usage: 72 },
-            { name: 'Harvard University', users: 167, usage: 68 },
-            { name: 'UC Berkeley', users: 134, usage: 55 }
-          ],
-          featureUsage: {
-            courses: 78,
-            surveys: 92,
-            analytics: 45,
-            reports: 23
-          }
+        usage: data.usage || {
+          dailyActiveUsers: [],
+          topOrganizations: [],
+          featureUsage: {}
         },
-        performance: {
-          responseTime: [
-            { time: '00:00', avg: 245, p95: 450 },
-            { time: '04:00', avg: 198, p95: 380 },
-            { time: '08:00', avg: 320, p95: 580 },
-            { time: '12:00', avg: 380, p95: 650 },
-            { time: '16:00', avg: 290, p95: 520 },
-            { time: '20:00', avg: 210, p95: 420 }
-          ],
-          errorRate: 0.02,
-          uptime: 99.8,
-          throughput: 1250
+        performance: data.performance || {
+          responseTime: [],
+          errorRate: 0,
+          uptime: 0,
+          throughput: 0
         },
-        billing: {
-          totalRevenue: 142500,
-          monthlyRecurring: 89200,
-          churnRate: 2.1,
-          averageRevenuePerUser: 114.32,
-          subscriptionBreakdown: {
-            basic: 156,
-            professional: 89,
-            enterprise: 23
-          }
+        billing: data.billing || {
+          totalRevenue: 0,
+          monthlyRecurring: 0,
+          churnRate: 0,
+          averageRevenuePerUser: 0,
+          subscriptionBreakdown: {}
         }
-      }
-      
-      setReportData(mockData)
+      })
     } catch (error) {
       console.error('Error fetching report data:', error)
       toast.error('Failed to load report data')
@@ -106,47 +78,37 @@ export default function SystemReportsPage() {
   const handleGenerateReport = async () => {
     setGenerating(true)
     try {
-      // Simulate report generation
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // Create CSV content based on selected report
-      let csvContent = ''
-      const timestamp = new Date().toISOString().split('T')[0]
-      
-      if (selectedReport === 'overview') {
-        csvContent = [
+      const response = await analyticsAPI.exportData({ type: selectedReport, dateRange })
+      const blob = new Blob([response.data], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${selectedReport}-report-${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+      window.URL.revokeObjectURL(url)
+      toast.success('Report generated and downloaded successfully!')
+    } catch (error) {
+      console.error('Error generating report:', error)
+      // Fallback: generate CSV from available reportData
+      if (reportData?.overview) {
+        const csvContent = [
           ['Metric', 'Value'].join(','),
           ['Total Users', reportData.overview.totalUsers].join(','),
           ['Total Organizations', reportData.overview.totalOrganizations].join(','),
           ['Total Courses', reportData.overview.totalCourses].join(','),
-          ['Total Surveys', reportData.overview.totalSurveys].join(','),
-          ['Active Users', reportData.overview.activeUsers].join(','),
-          ['Growth Rate (%)', reportData.overview.growthRate].join(','),
-          ['System Uptime (%)', reportData.overview.systemUptime].join(','),
-          ['Avg Response Time (ms)', reportData.overview.averageResponseTime].join(',')
+          ['Active Users', reportData.overview.activeUsers].join(',')
         ].join('\n')
-      } else if (selectedReport === 'usage') {
-        csvContent = [
-          ['Organization', 'Users', 'Usage %'].join(','),
-          ...reportData.usage.topOrganizations.map(org => 
-            [org.name, org.users, org.usage].join(',')
-          )
-        ].join('\n')
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${selectedReport}-report-${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+        window.URL.revokeObjectURL(url)
+        toast.success('Report exported from cached data')
+      } else {
+        toast.error('Failed to generate report')
       }
-      
-      // Download CSV
-      const blob = new Blob([csvContent], { type: 'text/csv' })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${selectedReport}-report-${timestamp}.csv`
-      a.click()
-      window.URL.revokeObjectURL(url)
-      
-      toast.success('Report generated and downloaded successfully!')
-    } catch (error) {
-      console.error('Error generating report:', error)
-      toast.error('Failed to generate report')
     } finally {
       setGenerating(false)
     }

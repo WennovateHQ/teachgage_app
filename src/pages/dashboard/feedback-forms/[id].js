@@ -5,7 +5,7 @@ import Link from 'next/link'
 import DashboardLayout from '../../../components/layout/DashboardLayout'
 import Breadcrumb from '../../../components/common/Breadcrumb'
 import { useAuth } from '../../../contexts/AuthContext'
-import { demoSurveys } from '../../../data/demoData'
+import { surveyAPI } from '../../../utils/api'
 import { 
   ArrowLeft,
   Edit,
@@ -43,52 +43,29 @@ export default function SurveyDetailPage() {
   }, [tab])
 
   useEffect(() => {
-    if (id) {
-      // Simulate API call to get survey details
-      setTimeout(() => {
-        const formData = demoSurveys.find(survey => survey.id === id) || {
-          id,
-          title: 'Course Evaluation Survey',
-          description: 'Please provide your feedback on this course to help us improve.',
-          status: 'active',
-          anonymous: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          responseCount: 23,
-          questions: [
-            {
-              id: 1,
-              type: 'rating',
-              question: 'How would you rate the overall quality of this course?',
-              required: true,
-              responses: 23
-            },
-            {
-              id: 2,
-              type: 'multiple_choice',
-              question: 'Which aspect of the course did you find most valuable?',
-              required: true,
-              responses: 23
-            },
-            {
-              id: 3,
-              type: 'text',
-              question: 'What suggestions do you have for improving this course?',
-              required: false,
-              responses: 18
-            }
-          ],
-          course: {
-            id: 'course-1',
-            name: 'Introduction to React',
-            code: 'CS101'
-          }
+    const loadSurvey = async () => {
+      // Guard against invalid id values (undefined, null, or the string "undefined")
+      if (!router.isReady || !id || id === 'undefined') return;
+      setIsLoading(true);
+      try {
+        const response = await surveyAPI.getSurvey(id);
+        const surveyData = response.data?.survey || response.data?.data || response.data;
+        if (surveyData) {
+          setForm({
+            ...surveyData,
+            id: surveyData.id || surveyData._id,
+            responseCount: surveyData.responseCount || surveyData.totalResponses || 0,
+            questions: surveyData.questions || [],
+          });
         }
-        setForm(formData)
-        setIsLoading(false)
-      }, 1000)
-    }
-  }, [id])
+      } catch (error) {
+        console.error('Failed to load survey:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSurvey();
+  }, [router.isReady, id])
 
   if (authLoading || isLoading) {
     return (
@@ -128,8 +105,12 @@ export default function SurveyDetailPage() {
   }
 
   const handleStatusChange = async (newStatus) => {
-    // Simulate API call
-    setForm(prev => ({ ...prev, status: newStatus }))
+    try {
+      await surveyAPI.updateSurvey(form.id || form._id, { status: newStatus })
+      setForm(prev => ({ ...prev, status: newStatus }))
+    } catch (error) {
+      console.error('Failed to update status:', error)
+    }
   }
 
   const breadcrumbItems = [
@@ -195,7 +176,7 @@ export default function SurveyDetailPage() {
                   </div>
                   <div className="flex items-center text-teachgage-navy">
                     <Calendar className="w-4 h-4 mr-2" />
-                    <span>Created {format(new Date(form.createdAt), 'MMM d, yyyy')}</span>
+                    <span>Created {form.createdAt ? format(new Date(form.createdAt), 'MMM d, yyyy') : 'N/A'}</span>
                   </div>
                   {form.course && (
                     <div className="flex items-center text-teachgage-navy">
@@ -286,7 +267,7 @@ export default function SurveyDetailPage() {
                       {form.questions?.map((question, index) => {
                         const Icon = getQuestionTypeIcon(question.type)
                         return (
-                          <div key={question.id} className="border border-gray-200 rounded-lg p-4">
+                          <div key={question.id || question._id || question.questionId || `question-${index}`} className="border border-gray-200 rounded-lg p-4">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center mb-2">
@@ -338,13 +319,13 @@ export default function SurveyDetailPage() {
                     </button>
                   </div>
                   
-                  {form.responseCount > 0 ? (
+                  {(form.responseCount || 0) > 0 ? (
                     <div className="space-y-4">
-                      {Array.from({ length: Math.min(form.responseCount, 5) }, (_, i) => (
+                      {Array.from({ length: Math.min(form.responseCount || 0, 5) }, (_, i) => (
                         <div key={i} className="border border-gray-200 rounded-lg p-4">
                           <div className="flex items-center justify-between mb-3">
                             <span className="text-sm font-medium text-teachgage-navy">
-                              Response #{form.responseCount - i}
+                              Response #{(form.responseCount || 0) - i}
                             </span>
                             <span className="text-xs text-gray-500">
                               {format(new Date(Date.now() - i * 86400000), 'MMM d, yyyy h:mm a')}
@@ -359,7 +340,7 @@ export default function SurveyDetailPage() {
                       <div className="text-center pt-4">
                         <Link href={`/dashboard/feedback-forms/${form.id}/responses`}>
                           <button className="text-teachgage-blue hover:text-teachgage-medium-blue font-medium">
-                            View All {form.responseCount} Responses
+                            View All {form.responseCount || 0} Responses
                           </button>
                         </Link>
                       </div>

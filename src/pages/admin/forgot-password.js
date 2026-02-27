@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { Mail, Shield, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { adminAuthAPI } from '../../utils/api'
 
 export default function AdminForgotPassword() {
   const [isLoading, setIsLoading] = useState(false)
@@ -18,14 +19,12 @@ export default function AdminForgotPassword() {
   const onSubmit = async (data) => {
     setIsLoading(true)
     try {
-      // Simulate API call for password reset
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
+      await adminAuthAPI.requestPasswordReset(data.email)
       setEmailSent(true)
       toast.success('Password reset instructions sent to your email!')
     } catch (error) {
       console.error('Password reset error:', error)
-      toast.error('Failed to send reset email. Please try again.')
+      toast.error(error.response?.data?.message || 'Failed to send reset email. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -125,21 +124,6 @@ export default function AdminForgotPassword() {
           </div>
         </div>
 
-        {/* Demo Notice */}
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-            <div className="flex">
-              <Shield className="h-5 w-5 text-blue-400 mr-2 mt-0.5" />
-              <div>
-                <h4 className="text-sm font-medium text-blue-800">Demo Mode</h4>
-                <p className="text-xs text-blue-600 mt-1">
-                  This is a demo implementation. In production, this would send actual 
-                  password reset emails to admin users.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </>
   )

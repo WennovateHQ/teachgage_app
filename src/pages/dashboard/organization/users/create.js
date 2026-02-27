@@ -4,6 +4,7 @@ import Head from 'next/head'
 import DashboardLayout from '../../../../components/layout/DashboardLayout'
 import Breadcrumb from '../../../../components/common/Breadcrumb'
 import { useAuth } from '../../../../contexts/AuthContext'
+import { userAPI } from '../../../../utils/api'
 import { 
   User, 
   Mail, 
@@ -95,14 +96,15 @@ export default function CreateUserPage() {
 
     setSaving(true)
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
+      await userAPI.createInstructor({
+        ...formData,
+        organizationId: user?.organizationId
+      })
       toast.success('User created successfully!')
       router.push('/dashboard/organization/users')
     } catch (error) {
       console.error('Error creating user:', error)
-      toast.error('Failed to create user. Please try again.')
+      toast.error(error.response?.data?.message || 'Failed to create user. Please try again.')
     } finally {
       setSaving(false)
     }

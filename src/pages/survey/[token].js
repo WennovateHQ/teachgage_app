@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import { demoSurveys } from '../../data/demoData'
+import { surveyAPI } from '../../utils/api'
 import { 
   CheckCircle,
   AlertCircle,
@@ -27,73 +27,30 @@ export default function SurveyResponsePage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (token) {
-      // Simulate token validation and survey loading
-      setTimeout(() => {
-        // For demo purposes, use the first survey
-        const surveyData = demoSurveys[0]
+    const loadSurvey = async () => {
+      if (!token) return;
+      setIsLoading(true);
+      try {
+        const response = await surveyAPI.validateInvitation(token);
+        const surveyData = response.data?.data?.survey || response.data?.data || response.data;
+        
         if (surveyData && surveyData.status === 'active') {
           setSurvey({
             ...surveyData,
-            questions: [
-              {
-                id: 1,
-                type: 'rating',
-                question: 'How would you rate the overall quality of this course?',
-                required: true,
-                options: { scale: 5, labels: ['Poor', 'Fair', 'Good', 'Very Good', 'Excellent'] }
-              },
-              {
-                id: 2,
-                type: 'multiple_choice',
-                question: 'Which aspect of the course did you find most valuable?',
-                required: true,
-                options: {
-                  choices: [
-                    'Course content and materials',
-                    'Instructor teaching style',
-                    'Practical exercises and assignments',
-                    'Class discussions and interactions',
-                    'Assessment methods'
-                  ]
-                }
-              },
-              {
-                id: 3,
-                type: 'likert',
-                question: 'Please indicate your level of agreement with the following statements:',
-                required: true,
-                options: {
-                  statements: [
-                    'The course objectives were clearly defined',
-                    'The instructor was well-prepared for classes',
-                    'The workload was appropriate for the course level',
-                    'I would recommend this course to other students'
-                  ],
-                  scale: ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree']
-                }
-              },
-              {
-                id: 4,
-                type: 'text',
-                question: 'What suggestions do you have for improving this course?',
-                required: false,
-                options: { placeholder: 'Please share your thoughts and suggestions...' }
-              },
-              {
-                id: 5,
-                type: 'yes_no',
-                question: 'Would you recommend this course to other students?',
-                required: true
-              }
-            ]
-          })
+            id: surveyData.id || surveyData._id,
+            questions: surveyData.questions || [],
+          });
         } else {
-          setError('Survey not found or no longer active.')
+          setError('Survey not found or no longer active.');
         }
-        setIsLoading(false)
-      }, 1000)
-    }
+      } catch (err) {
+        console.error('Failed to load survey:', err);
+        setError('Survey not found or no longer active.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSurvey();
   }, [token])
 
   const handleResponse = (questionId, value) => {
@@ -129,13 +86,17 @@ export default function SurveyResponsePage() {
     }
 
     try {
-      // Simulate API submission
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setIsCompleted(true)
-    } catch (error) {
-      setError('Failed to submit survey. Please try again.')
+      await surveyAPI.submitResponse(survey.id, {
+        token,
+        responses,
+        completedAt: new Date().toISOString(),
+      });
+      setIsCompleted(true);
+    } catch (err) {
+      console.error('Failed to submit survey:', err);
+      setError('Failed to submit survey. Please try again.');
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 
@@ -327,6 +288,25 @@ export default function SurveyResponsePage() {
               <div className="flex items-center text-sm text-teachgage-navy">
                 <Clock className="w-4 h-4 mr-1" />
                 <span>~5 minutes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Anonymity Disclosure Banner */}
+        <div className="bg-emerald-50 border-b border-emerald-200">
+          <div className="max-w-4xl mx-auto px-4 py-3">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 p-1.5 bg-emerald-100 rounded-full mr-3">
+                <Shield className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-emerald-800">
+                  Your responses are 100% anonymous
+                </p>
+                <p className="text-xs text-emerald-700">
+                  Your identity cannot be linked to your answers. Results are aggregated and shared only in summary form.
+                </p>
               </div>
             </div>
           </div>

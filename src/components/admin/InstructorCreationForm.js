@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { demoDepartments } from '@/data/demoData';
+import { departmentAPI, userAPI } from '@/utils/api';
 import { 
   X, 
   User, 
@@ -30,10 +30,22 @@ export default function InstructorCreationForm({ onClose, onSuccess }) {
   const [isSuccess, setIsSuccess] = useState(false);
   const [createdInstructor, setCreatedInstructor] = useState(null);
 
-  // Get organization departments
-  const organizationDepartments = demoDepartments.filter(
-    dept => dept.organizationId === user?.organizationId
-  );
+  const [organizationDepartments, setOrganizationDepartments] = useState([]);
+
+  // Load organization departments
+  useEffect(() => {
+    const loadDepartments = async () => {
+      if (!user?.organizationId) return;
+      try {
+        const response = await departmentAPI.getDepartments({ organizationId: user.organizationId });
+        const depts = response.data?.data?.departments || response.data?.data || response.data?.departments || [];
+        setOrganizationDepartments(depts.map(d => ({ ...d, id: d.id || d._id })));
+      } catch (error) {
+        console.error('Failed to load departments:', error);
+      }
+    };
+    loadDepartments();
+  }, [user?.organizationId]);
 
   // Handle input changes
   const handleChange = (e) => {
@@ -102,27 +114,17 @@ export default function InstructorCreationForm({ onClose, onSuccess }) {
       // Generate temporary password
       const tempPassword = generateTempPassword();
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Create instructor data
-      const instructorData = {
-        id: `org-inst-${Date.now()}`,
+      const response = await userAPI.createInstructor({
         ...formData,
-        role: 'instructor',
-        accountTier: 'professional', // Inherited from organization
-        status: 'pending_password_change',
-        emailVerified: true,
         organizationId: user.organizationId,
-        createdBy: user.id,
-        mustChangePassword: true,
         temporaryPassword: tempPassword,
-        createdAt: new Date().toISOString(),
-        lastLogin: null,
-        profilePhoto: null
-      };
+      });
 
-      console.log('Creating instructor:', instructorData);
+      const instructorData = response.data?.data || response.data || {
+        ...formData,
+        organizationId: user.organizationId,
+        temporaryPassword: tempPassword,
+      };
 
       setCreatedInstructor({
         ...instructorData,

@@ -29,11 +29,15 @@ import {
   ChevronUp
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useRouter } from 'next/router'
+import { surveyAPI } from '../../utils/api'
 import QuestionTypeSelector from './QuestionTypeSelector'
 import QuestionEditor from './QuestionEditor'
 import SurveyPreview from './SurveyPreview'
 
 export default function SurveyBuilder({ surveyId = null, initialData = null }) {
+  const router = useRouter()
+  const [currentSurveyId, setCurrentSurveyId] = useState(surveyId)
   const [survey, setSurvey] = useState(initialData || {
     title: 'Untitled Survey',
     description: '',
@@ -62,7 +66,12 @@ export default function SurveyBuilder({ surveyId = null, initialData = null }) {
     { id: 'matrix', name: 'Matrix', icon: '🔢' },
     { id: 'rank_order', name: 'Rank Order', icon: '🔢' },
     { id: 'dichotomous', name: 'Yes/No', icon: '✅' },
-    { id: 'opinion_scale', name: 'Opinion Scale', icon: '💭' }
+    { id: 'opinion_scale', name: 'Opinion Scale', icon: '💭' },
+    { id: 'nps', name: 'Net Promoter Score', icon: '📈' },
+    { id: 'demographic', name: 'Demographic', icon: '👤' },
+    { id: 'picture_choice', name: 'Picture Choice', icon: '🖼️' },
+    { id: 'file_upload', name: 'File Upload', icon: '📎' },
+    { id: 'date_time', name: 'Date / Time', icon: '📅' }
   ]
 
   const addQuestion = useCallback((type) => {
@@ -146,13 +155,39 @@ export default function SurveyBuilder({ surveyId = null, initialData = null }) {
   }, [])
 
   const saveSurvey = async () => {
+    if (!survey.title.trim()) {
+      toast.error('Please enter a survey title')
+      return
+    }
+
     setIsSaving(true)
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      toast.success('Survey saved successfully!')
+      const surveyData = {
+        title: survey.title,
+        description: survey.description,
+        questions: survey.questions.map((q, index) => ({
+          ...q,
+          order: index
+        })),
+        status: 'draft'
+      }
+
+      let response
+      if (currentSurveyId) {
+        response = await surveyAPI.updateSurvey(currentSurveyId, surveyData)
+        toast.success('Survey updated successfully!')
+      } else {
+        response = await surveyAPI.createSurvey(surveyData)
+        const newId = response.data?.data?._id || response.data?.data?.id || response.data?._id || response.data?.id
+        if (newId) {
+          setCurrentSurveyId(newId)
+        }
+        toast.success('Survey created successfully!')
+      }
     } catch (error) {
-      toast.error('Failed to save survey')
+      console.error('Failed to save survey:', error)
+      const errorMsg = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to save survey'
+      toast.error(errorMsg)
     } finally {
       setIsSaving(false)
     }
@@ -238,6 +273,7 @@ export default function SurveyBuilder({ surveyId = null, initialData = null }) {
                     index={index}
                     isActive={activeQuestion === question.id}
                     isCollapsed={isCollapsed[question.id]}
+                    allQuestions={survey.questions}
                     onUpdate={updateQuestion}
                     onDelete={deleteQuestion}
                     onDuplicate={duplicateQuestion}
@@ -346,6 +382,39 @@ function getDefaultQuestionConfig(type) {
         leftLabel: 'Strongly Disagree',
         rightLabel: 'Strongly Agree'
       }
+    },
+    nps: {
+      scale: {
+        min: 0,
+        max: 10,
+        leftLabel: 'Not at all likely',
+        rightLabel: 'Extremely likely'
+      },
+      question: 'How likely are you to recommend this educator/course to a colleague?'
+    },
+    demographic: {
+      demographicType: 'custom',
+      options: ['Option 1', 'Option 2', 'Option 3'],
+      placeholder: 'Select...'
+    },
+    picture_choice: {
+      imageOptions: [
+        { label: 'Option 1', imageUrl: '', altText: 'Option 1' },
+        { label: 'Option 2', imageUrl: '', altText: 'Option 2' }
+      ],
+      allowMultiple: false
+    },
+    file_upload: {
+      allowedTypes: ['pdf', 'docx', 'jpg', 'png'],
+      maxFileSizeMB: 10,
+      uploadInstructions: 'Upload a relevant document',
+      allowMultipleFiles: false
+    },
+    date_time: {
+      dateTimeMode: 'date',
+      minDate: '',
+      maxDate: '',
+      placeholder: 'Select a date...'
     }
   }
   

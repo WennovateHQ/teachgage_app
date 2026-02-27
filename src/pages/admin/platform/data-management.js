@@ -16,6 +16,7 @@ import {
   BarChart3
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { analyticsAPI } from '../../../utils/api'
 
 export default function DataManagementPage() {
   const [loading, setLoading] = useState(true)
@@ -29,55 +30,18 @@ export default function DataManagementPage() {
 
   const fetchDataManagementInfo = async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const response = await analyticsAPI.getDashboardStats()
+      const data = response.data?.data || response.data || {}
       
-      const mockBackups = [
-        {
-          id: 1,
-          name: 'Daily Backup - 2024-01-18',
-          type: 'automated',
-          size: '2.4 GB',
-          status: 'completed',
-          createdAt: '2024-01-18T02:00:00Z',
-          tables: ['users', 'organizations', 'courses', 'surveys', 'responses']
-        },
-        {
-          id: 2,
-          name: 'Weekly Full Backup - 2024-01-15',
-          type: 'automated',
-          size: '15.2 GB',
-          status: 'completed',
-          createdAt: '2024-01-15T01:00:00Z',
-          tables: ['all']
-        },
-        {
-          id: 3,
-          name: 'Manual Backup - Pre Migration',
-          type: 'manual',
-          size: '12.8 GB',
-          status: 'completed',
-          createdAt: '2024-01-10T14:30:00Z',
-          tables: ['users', 'organizations', 'courses']
-        }
-      ]
-
-      const mockStorageStats = {
-        totalStorage: 50, // GB
-        usedStorage: 18.7, // GB
-        availableStorage: 31.3, // GB
-        databaseSize: 12.4, // GB
-        backupSize: 6.3, // GB
-        tableStats: [
-          { name: 'users', size: '2.1 GB', records: 1247 },
-          { name: 'organizations', size: '0.8 GB', records: 47 },
-          { name: 'courses', size: '3.2 GB', records: 892 },
-          { name: 'surveys', size: '1.9 GB', records: 2156 },
-          { name: 'responses', size: '4.4 GB', records: 15678 }
-        ]
-      }
-
-      setBackups(mockBackups)
-      setStorageStats(mockStorageStats)
+      setBackups(data.backups || [])
+      setStorageStats(data.storageStats || {
+        totalStorage: 0,
+        usedStorage: 0,
+        availableStorage: 0,
+        databaseSize: 0,
+        backupSize: 0,
+        tableStats: []
+      })
     } catch (error) {
       console.error('Error fetching data management info:', error)
       toast.error('Failed to load data management information')
@@ -88,17 +52,32 @@ export default function DataManagementPage() {
 
   const handleCreateBackup = async () => {
     toast('Creating backup...')
-    // Simulate backup creation
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    toast.success('Backup created successfully!')
+    try {
+      await analyticsAPI.generateCustomReport({ type: 'backup' })
+      toast.success('Backup created successfully!')
+      fetchDataManagementInfo()
+    } catch (error) {
+      console.error('Backup creation error:', error)
+      toast.error(error.response?.data?.message || 'Failed to create backup')
+    }
   }
 
-  const handleDownloadBackup = (backupId) => {
+  const handleDownloadBackup = async (backupId) => {
     toast('Preparing backup download...')
-    // Simulate download preparation
-    setTimeout(() => {
+    try {
+      const response = await analyticsAPI.exportData({ type: 'backup', backupId })
+      const blob = new Blob([response.data], { type: 'application/octet-stream' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `backup-${backupId}.gz`
+      a.click()
+      window.URL.revokeObjectURL(url)
       toast.success('Backup download started!')
-    }, 1000)
+    } catch (error) {
+      console.error('Download error:', error)
+      toast.error(error.response?.data?.message || 'Failed to download backup')
+    }
   }
 
   const handleDeleteBackup = (backupId) => {

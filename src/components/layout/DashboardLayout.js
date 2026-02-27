@@ -20,7 +20,10 @@ import {
   Building2,
   CreditCard,
   Mail,
-  Layers
+  Layers,
+  ClipboardList,
+  Brain,
+  HelpCircle
 } from 'lucide-react'
 
 export default function DashboardLayout({ children, title = 'Dashboard' }) {
@@ -33,8 +36,10 @@ export default function DashboardLayout({ children, title = 'Dashboard' }) {
     { name: 'Dashboard', href: '/dashboard', icon: Home, current: router.pathname === '/dashboard' },
     { name: 'Courses', href: '/dashboard/courses', icon: BookOpen, current: router.pathname.startsWith('/dashboard/courses') },
     { name: 'Surveys', href: '/dashboard/feedback-forms', icon: FileText, current: router.pathname.startsWith('/dashboard/feedback-forms') },
+    { name: 'Questionnaires', href: '/dashboard/questionnaires', icon: ClipboardList, current: router.pathname.startsWith('/dashboard/questionnaires') },
     { name: 'Pipeline', href: '/dashboard/pipelines', icon: Layers, current: router.pathname.startsWith('/dashboard/pipelines') },
     { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3, current: router.pathname.startsWith('/dashboard/analytics') },
+    { name: 'AI Insights', href: '/dashboard/ai-insights', icon: Brain, current: router.pathname.startsWith('/dashboard/ai-insights') },
   ]
 
   // Additional navigation for organization admins
@@ -46,8 +51,9 @@ export default function DashboardLayout({ children, title = 'Dashboard' }) {
     { name: 'Notifications', href: '/dashboard/organization/notifications', icon: Mail, current: router.pathname.startsWith('/dashboard/organization/notifications') },
   ]
 
-  // Settings always at the end
+  // Settings and help at the end
   const settingsNavigation = [
+    { name: 'Help', href: '/dashboard/help', icon: HelpCircle, current: router.pathname.startsWith('/dashboard/help') || router.pathname.startsWith('/dashboard/guides') },
     { name: 'Settings', href: '/dashboard/settings', icon: Settings, current: router.pathname.startsWith('/dashboard/settings') },
   ]
 

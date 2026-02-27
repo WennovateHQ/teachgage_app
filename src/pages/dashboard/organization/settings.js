@@ -4,6 +4,7 @@ import Head from 'next/head'
 import DashboardLayout from '../../../components/layout/DashboardLayout'
 import Breadcrumb from '../../../components/common/Breadcrumb'
 import { useAuth } from '../../../contexts/AuthContext'
+import { organizationAPI } from '../../../utils/api'
 import { 
   Building,
   Save,
@@ -143,12 +144,11 @@ export default function OrganizationSettingsPage() {
     setIsSaving(true)
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await organizationAPI.updateSettings(user?.organizationId, formData)
       alert('Organization settings saved successfully!')
     } catch (error) {
       console.error('Save error:', error)
-      alert('Failed to save settings. Please try again.')
+      alert(error.response?.data?.message || 'Failed to save settings. Please try again.')
     } finally {
       setIsSaving(false)
     }

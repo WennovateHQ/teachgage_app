@@ -14,6 +14,7 @@ import {
   CreditCard
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { organizationAPI } from '../../../../../utils/api'
 
 export default function EditOrganizationPage() {
   const router = useRouter()
@@ -48,47 +49,27 @@ export default function EditOrganizationPage() {
 
   const fetchOrganizationDetails = async () => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const response = await organizationAPI.getOrganization(id)
+      const org = response.data?.data || response.data || null
       
-      // Mock organization data
-      const mockOrganization = {
-        id: id,
-        name: 'Stanford University',
-        type: 'academic',
-        subscriptionTier: 'enterprise',
-        status: 'active',
-        maxUsers: 500,
-        contactInfo: {
-          email: 'admin@stanford.edu',
-          phone: '+1-650-723-2300',
-          website: 'https://stanford.edu'
-        },
-        address: {
-          street: '450 Serra Mall',
-          city: 'Stanford',
-          state: 'CA',
-          zipCode: '94305',
-          country: 'US'
-        }
+      if (org) {
+        setOrganization(org)
+        setFormData({
+          name: org.name || '',
+          type: org.type || 'academic',
+          website: org.contactInfo?.website || org.website || '',
+          email: org.contactInfo?.email || org.email || '',
+          phone: org.contactInfo?.phone || org.phone || '',
+          street: org.address?.street || '',
+          city: org.address?.city || '',
+          state: org.address?.state || '',
+          zipCode: org.address?.zipCode || '',
+          country: org.address?.country || 'US',
+          subscriptionTier: org.subscriptionTier || org.subscription_tier || 'basic',
+          maxUsers: org.maxUsers || org.max_users || 50,
+          status: org.status || 'active'
+        })
       }
-      
-      setOrganization(mockOrganization)
-      setFormData({
-        name: mockOrganization.name,
-        type: mockOrganization.type,
-        website: mockOrganization.contactInfo.website,
-        email: mockOrganization.contactInfo.email,
-        phone: mockOrganization.contactInfo.phone,
-        street: mockOrganization.address.street,
-        city: mockOrganization.address.city,
-        state: mockOrganization.address.state,
-        zipCode: mockOrganization.address.zipCode,
-        country: mockOrganization.address.country,
-        subscriptionTier: mockOrganization.subscriptionTier,
-        maxUsers: mockOrganization.maxUsers,
-        status: mockOrganization.status
-      })
     } catch (error) {
       console.error('Error fetching organization details:', error)
       toast.error('Failed to load organization details')
@@ -161,17 +142,30 @@ export default function EditOrganizationPage() {
     setSaving(true)
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // In a real app, this would call the backend API
-      console.log('Updating organization:', formData)
-      
+      await organizationAPI.updateOrganization(id, {
+        name: formData.name,
+        type: formData.type,
+        status: formData.status,
+        subscriptionTier: formData.subscriptionTier,
+        maxUsers: formData.maxUsers,
+        contactInfo: {
+          email: formData.email,
+          phone: formData.phone,
+          website: formData.website
+        },
+        address: {
+          street: formData.street,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          country: formData.country
+        }
+      })
       toast.success('Organization updated successfully!')
       router.push(`/admin/platform/organizations/${id}`)
     } catch (error) {
       console.error('Save error:', error)
-      toast.error('Failed to update organization. Please try again.')
+      toast.error(error.response?.data?.message || 'Failed to update organization. Please try again.')
     } finally {
       setSaving(false)
     }

@@ -3,7 +3,7 @@ import { Download, FileText, Image, Table } from 'lucide-react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 
-export default function ExportControls({ onExport }) {
+export default function ExportControls({ onExport, stats = {}, trends = [] }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
 
@@ -75,11 +75,10 @@ export default function ExportControls({ onExport }) {
     
     pdf.setFontSize(10)
     const summaryText = [
-      '• Total Responses: 1,247',
-      '• Average Rating: 4.3/5.0',
-      '• Response Rate: 87.5%',
-      '• Active Courses: 45',
-      '• Top Department: Computer Science (4.5 avg rating)'
+      `• Total Responses: ${stats.totalResponses || 0}`,
+      `• Average Rating: ${(stats.averageRating || 0).toFixed(1)}/5.0`,
+      `• Response Rate: ${stats.responseRate || 0}%`,
+      `• Active Forms: ${stats.activeForms || 0}`
     ]
     
     summaryText.forEach((text, index) => {
@@ -120,17 +119,27 @@ export default function ExportControls({ onExport }) {
   }
 
   const generateCSVExport = async () => {
-    // Sample CSV data - in real implementation, this would come from props/API
-    const csvData = [
-      ['Date', 'Responses', 'Average Rating', 'Response Rate'],
-      ['2024-01-01', '23', '4.2', '85%'],
-      ['2024-01-02', '31', '4.1', '88%'],
-      ['2024-01-03', '28', '4.4', '90%'],
-      ['2024-01-04', '35', '4.3', '87%'],
-      ['2024-01-05', '42', '4.5', '92%'],
-      ['2024-01-06', '38', '4.2', '89%'],
-      ['2024-01-07', '45', '4.6', '94%']
-    ]
+    // Build CSV from real data
+    const csvData = [['Date', 'Responses', 'Average Rating', 'Response Rate']]
+    
+    if (trends.length > 0) {
+      trends.forEach(item => {
+        csvData.push([
+          item.date || '',
+          String(item.responses || item.count || 0),
+          String(item.averageRating || item.rating || ''),
+          item.responseRate ? `${item.responseRate}%` : ''
+        ])
+      })
+    } else {
+      // If no trend data, export summary stats
+      csvData.push([
+        new Date().toISOString().split('T')[0],
+        String(stats.totalResponses || 0),
+        String((stats.averageRating || 0).toFixed(1)),
+        stats.responseRate ? `${stats.responseRate}%` : '0%'
+      ])
+    }
 
     const csvContent = csvData.map(row => row.join(',')).join('\n')
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })

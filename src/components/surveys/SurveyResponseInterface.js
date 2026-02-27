@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { demoSurveys } from '@/data/demoData';
+import { surveyAPI } from '@/utils/api';
 import { 
   CheckCircle, 
   Clock, 
@@ -27,27 +27,32 @@ export default function SurveyResponseInterface({ surveyId, token }) {
 
   // Load survey data
   useEffect(() => {
-    const loadSurvey = () => {
-      // In a real app, this would validate the token and fetch the survey
-      const surveyData = demoSurveys.find(s => s.id === surveyId);
-      
-      if (!surveyData) {
-        alert('Survey not found or invalid token');
-        return;
-      }
-
-      setSurvey(surveyData);
-      
-      // Initialize responses object
-      const initialResponses = {};
-      surveyData.questions.forEach(question => {
-        if (question.type === 'likert_scale') {
-          initialResponses[question.id] = {};
-        } else {
-          initialResponses[question.id] = '';
+    const loadSurvey = async () => {
+      try {
+        const response = await surveyAPI.getSurvey(surveyId);
+        const surveyData = response.data?.data || response.data;
+        
+        if (!surveyData) {
+          alert('Survey not found or invalid token');
+          return;
         }
-      });
-      setResponses(initialResponses);
+
+        setSurvey({ ...surveyData, id: surveyData.id || surveyData._id });
+        
+        // Initialize responses object
+        const initialResponses = {};
+        (surveyData.questions || []).forEach(question => {
+          if (question.type === 'likert_scale') {
+            initialResponses[question.id] = {};
+          } else {
+            initialResponses[question.id] = '';
+          }
+        });
+        setResponses(initialResponses);
+      } catch (error) {
+        console.error('Failed to load survey:', error);
+        alert('Survey not found or invalid token');
+      }
     };
 
     if (surveyId) {
@@ -160,10 +165,6 @@ export default function SurveyResponseInterface({ surveyId, token }) {
     setIsSubmitting(true);
 
     try {
-      // Simulate API submission
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Prepare response data
       const responseData = {
         surveyId,
         responses: Object.entries(responses).map(([questionId, answer]) => {
@@ -179,8 +180,7 @@ export default function SurveyResponseInterface({ surveyId, token }) {
         timeSpent
       };
 
-      console.log('Survey response submitted:', responseData);
-      
+      await surveyAPI.submitResponse(surveyId, responseData);
       setIsCompleted(true);
     } catch (error) {
       console.error('Failed to submit survey:', error);

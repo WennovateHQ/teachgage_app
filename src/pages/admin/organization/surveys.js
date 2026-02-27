@@ -15,6 +15,7 @@ import {
   CheckCircle,
   Clock
 } from 'lucide-react'
+import { surveyAPI } from '../../../utils/api'
 
 export default function OrganizationSurveysPage() {
   const router = useRouter()
@@ -23,54 +24,23 @@ export default function OrganizationSurveysPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [departmentFilter, setDepartmentFilter] = useState('all')
 
-  // Mock data
-  const [surveys, setSurveys] = useState([
-    {
-      id: 'survey_1',
-      title: 'Mid-Semester Evaluation - CS101',
-      course: 'Introduction to Computer Science',
-      instructor: 'Dr. Sarah Johnson',
-      department: 'Computer Science',
-      status: 'active',
-      responses: 42,
-      totalStudents: 45,
-      responseRate: 93,
-      createdDate: '2024-10-01',
-      dueDate: '2024-10-15'
-    },
-    {
-      id: 'survey_2',
-      title: 'Course Feedback - MATH301',
-      course: 'Advanced Mathematics',
-      instructor: 'Prof. Michael Chen',
-      department: 'Mathematics',
-      status: 'completed',
-      responses: 28,
-      totalStudents: 32,
-      responseRate: 87,
-      createdDate: '2024-09-15',
-      dueDate: '2024-09-30'
-    },
-    {
-      id: 'survey_3',
-      title: 'Lab Experience Survey - PHYS201',
-      course: 'Physics Laboratory',
-      instructor: 'Dr. Emily Rodriguez',
-      department: 'Physics',
-      status: 'draft',
-      responses: 0,
-      totalStudents: 28,
-      responseRate: 0,
-      createdDate: '2024-10-05',
-      dueDate: '2024-10-20'
-    }
-  ])
+  const [surveys, setSurveys] = useState([])
 
   const departments = ['Computer Science', 'Mathematics', 'Physics', 'Engineering', 'Business']
 
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => setLoading(false), 1000)
+    const fetchSurveys = async () => {
+      try {
+        const response = await surveyAPI.getSurveys()
+        const data = response.data?.data || response.data || []
+        setSurveys(Array.isArray(data) ? data : data.surveys || [])
+      } catch (error) {
+        console.error('Error fetching surveys:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchSurveys()
   }, [])
 
   const filteredSurveys = surveys.filter(survey => {
@@ -93,10 +63,15 @@ export default function OrganizationSurveysPage() {
     router.push(`/dashboard/feedback-forms/${surveyId}/edit`)
   }
 
-  const handleDeleteSurvey = (surveyId) => {
-    const survey = surveys.find(s => s.id === surveyId)
-    if (window.confirm(`Are you sure you want to delete "${survey.title}"?`)) {
-      setSurveys(prev => prev.filter(s => s.id !== surveyId))
+  const handleDeleteSurvey = async (surveyId) => {
+    const survey = surveys.find(s => (s.id || s._id) === surveyId)
+    if (window.confirm(`Are you sure you want to delete "${survey?.title}"?`)) {
+      try {
+        await surveyAPI.deleteSurvey(surveyId)
+        setSurveys(prev => prev.filter(s => (s.id || s._id) !== surveyId))
+      } catch (error) {
+        console.error('Error deleting survey:', error)
+      }
     }
   }
 

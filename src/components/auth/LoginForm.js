@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
-import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, isLoading, error, clearError } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -17,6 +18,17 @@ export default function LoginForm() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Check for registration success message
+  useEffect(() => {
+    const registered = searchParams.get('registered');
+    const message = searchParams.get('message');
+    
+    if (registered === 'true' && message) {
+      setSuccessMessage(decodeURIComponent(message));
+    }
+  }, [searchParams]);
 
   // Handle input changes
   const handleChange = (e) => {
@@ -86,48 +98,6 @@ export default function LoginForm() {
     }
   };
 
-  // Demo account suggestions
-  const demoAccounts = [
-    {
-      type: 'Basic Instructor',
-      email: 'john.basic@example.com',
-      description: 'Free account with basic features'
-    },
-    {
-      type: 'Professional Instructor (Trial)',
-      email: 'sarah.wilson@university.edu',
-      description: 'Professional account with 15 days remaining'
-    },
-    {
-      type: 'Professional Instructor (Paid)',
-      email: 'mike.johnson@college.edu',
-      description: 'Professional account with active subscription'
-    },
-    {
-      type: 'Organization Admin',
-      email: 'admin@techuniversity.edu',
-      description: 'Organization admin with trial active'
-    },
-    {
-      type: 'Organization Instructor',
-      email: 'david.chen@techuniversity.edu',
-      description: 'Instructor created by organization admin'
-    },
-    {
-      type: 'New Organization Instructor',
-      email: 'lisa.martinez@techuniversity.edu',
-      description: 'Must change password on first login'
-    }
-  ];
-
-  // Fill demo account
-  const fillDemoAccount = (email) => {
-    setFormData({
-      email,
-      password: email === 'lisa.martinez@techuniversity.edu' ? 'TempPass123!' : 'password123'
-    });
-    clearError();
-  };
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -146,6 +116,16 @@ export default function LoginForm() {
           <h2 className="text-3xl font-bold text-teachgage-blue">Welcome Back</h2>
           <p className="mt-2 text-teachgage-navy">Sign in to your TeachGage account</p>
         </div>
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start space-x-3">
+            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-green-800">{successMessage}</p>
+            </div>
+          </div>
+        )}
 
         {/* Login Form */}
         <div className="bg-white rounded-lg shadow-lg p-8">
@@ -252,42 +232,6 @@ export default function LoginForm() {
           </form>
         </div>
 
-        {/* Demo Accounts */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <h3 className="text-lg font-semibold text-teachgage-blue mb-4">Demo Accounts</h3>
-          <p className="text-sm text-teachgage-navy mb-4">
-            Try different account types with these demo credentials:
-          </p>
-          
-          <div className="space-y-3">
-            {demoAccounts.map((account, index) => (
-              <div
-                key={index}
-                className="border border-gray-200 rounded-md p-3 hover:bg-gray-50 cursor-pointer transition-colors"
-                onClick={() => fillDemoAccount(account.email)}
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h4 className="text-sm font-medium text-teachgage-blue">{account.type}</h4>
-                    <p className="text-xs text-teachgage-navy mt-1">{account.description}</p>
-                    <p className="text-xs text-teachgage-blue mt-1">{account.email}</p>
-                  </div>
-                  <button className="text-xs text-teachgage-orange hover:text-teachgage-blue font-medium">
-                    Use
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          <div className="mt-4 p-3 bg-orange-50 border border-teachgage-orange rounded-md">
-            <p className="text-xs text-teachgage-navy">
-              <strong>Password for all demo accounts:</strong> password123
-              <br />
-              <strong>Exception:</strong> lisa.martinez@techuniversity.edu uses TempPass123!
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -30,6 +30,15 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   async (config) => {
+    console.log('\n========== AXIOS REQUEST ==========');
+    console.log('URL:', config.baseURL + config.url);
+    console.log('Method:', config.method?.toUpperCase());
+    console.log('Headers:', JSON.stringify(config.headers, null, 2));
+    if (config.data) {
+      console.log('Data:', JSON.stringify(config.data, null, 2));
+    }
+    console.log('===================================\n');
+    
     const token = localStorage.getItem('teachgage_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -37,14 +46,31 @@ api.interceptors.request.use(
     return config
   },
   (error) => {
+    console.error('\n========== AXIOS REQUEST ERROR ==========');
+    console.error('Error:', error);
+    console.error('=========================================\n');
     return Promise.reject(error)
   }
 )
 
 // Response interceptor for error handling and token refresh
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('\n========== AXIOS RESPONSE ==========');
+    console.log('URL:', response.config.url);
+    console.log('Status:', response.status);
+    console.log('Data:', JSON.stringify(response.data, null, 2));
+    console.log('====================================\n');
+    return response;
+  },
   async (error) => {
+    console.error('\n========== AXIOS RESPONSE ERROR ==========');
+    console.error('URL:', error.config?.url);
+    console.error('Status:', error.response?.status);
+    console.error('Status Text:', error.response?.statusText);
+    console.error('Response Data:', JSON.stringify(error.response?.data, null, 2));
+    console.error('Error Message:', error.message);
+    console.error('==========================================\n');
     const originalRequest = error.config
 
     // Handle 401 Unauthorized
@@ -114,8 +140,9 @@ export const authAPI = {
     email: data.email,
     password: data.password
   }),
-  signout: () => api.post('/api/auth/signout'),
+  signout: () => api.post('/api/auth/logout'),
   refreshToken: () => api.post('/api/auth/refresh'),
+  getSession: () => api.get('/api/auth/session'),
   requestPasswordReset: (email) => api.post('/api/auth/password-reset-request', { email }),
   resetPassword: (data) => api.post('/api/auth/password-reset', {
     token: data.token,
@@ -138,17 +165,21 @@ export const adminAuthAPI = {
 }
 
 export const userAPI = {
-  getProfile: () => api.get('/api/user/profile'),
-  updateProfile: (data) => api.put('/api/user/profile', data),
-  changePassword: (data) => api.put('/api/user/change-password', data),
-  deleteAccount: () => api.delete('/api/user/account'),
+  getUsers: (params) => api.get('/api/users', { params }),
+  getUser: (id) => api.get(`/api/users/${id}`),
+  getProfile: () => api.get('/api/auth/session'),
+  updateProfile: (id, data) => api.patch(`/api/users/${id}`, data),
+  deleteUser: (id) => api.delete(`/api/users/${id}`),
+  createInstructor: (data) => api.post('/api/users/instructors', data),
+  batchImportInstructors: (data) => api.post('/api/users/instructors/batch', data),
+  createDepartmentAdmin: (data) => api.post('/api/users/department-admins', data),
 }
 
 export const courseAPI = {
   getCourses: (params) => api.get('/api/courses', { params }),
   getCourse: (id) => api.get(`/api/courses/${id}`),
   createCourse: (data) => api.post('/api/courses', {
-    title: data.title,
+    name: data.name || data.title,
     description: data.description,
     objectives: data.objectives || [],
     prerequisites: data.prerequisites || [],
@@ -156,9 +187,22 @@ export const courseAPI = {
     departmentId: data.departmentId,
     startDate: data.startDate,
     endDate: data.endDate,
-    maxStudents: data.maxStudents
+    capacity: data.maxStudents || data.capacity,
+    status: data.status || 'draft'
   }),
-  updateCourse: (id, data) => api.put(`/api/courses/${id}`, data),
+  updateCourse: (id, data) => api.put(`/api/courses/${id}`, {
+    name: data.name || data.title,
+    code: data.code,
+    description: data.description,
+    startDate: data.startDate,
+    endDate: data.endDate,
+    capacity: data.capacity || data.maxStudents,
+    status: data.status,
+    // Store additional fields in metadata if needed
+    ...(data.category && { tags: [data.category] }),
+    ...(data.prerequisites && { metadata: { prerequisites: data.prerequisites } }),
+    ...(data.learningObjectives && { metadata: { ...data.metadata, learningObjectives: data.learningObjectives } })
+  }),
   deleteCourse: (id) => api.delete(`/api/courses/${id}`),
   duplicateCourse: (id) => api.post(`/api/courses/${id}/duplicate`),
   batchUpload: (file, options) => {
@@ -184,17 +228,43 @@ export const courseAPI = {
     endDate: data.endDate,
     sessions: data.sessions || []
   }),
+  
+  // Enrollments
+  enrollStudent: (courseId, data) => api.post(`/api/courses/${courseId}/enrollments`, data),
+  getCourseEnrollments: (courseId, params) => api.get(`/api/courses/${courseId}/enrollments`, { params }),
+  unenrollStudent: (courseId, enrollmentId) => api.delete(`/api/courses/${courseId}/enrollments/${enrollmentId}`),
+  batchEnrollStudents: (courseId, students) => api.post(`/api/courses/${courseId}/enrollments/batch`, { students }),
 }
 
 export const feedbackAPI = {
-  getForms: (params) => api.get('/api/feedback-forms', { params }),
-  getForm: (id) => api.get(`/api/feedback-forms/${id}`),
-  createForm: (data) => api.post('/api/feedback-forms', data),
-  updateForm: (id, data) => api.put(`/api/feedback-forms/${id}`, data),
-  deleteForm: (id) => api.delete(`/api/feedback-forms/${id}`),
-  getResponses: (formId, params) => api.get(`/api/feedback-forms/${formId}/responses`, { params }),
-  submitResponse: (formId, data) => api.post(`/api/feedback-forms/${formId}/responses`, data),
-  getAnalytics: (formId) => api.get(`/api/feedback-forms/${formId}/analytics`),
+  // Feedback forms map to surveys on backend - no separate /api/feedback-forms endpoint
+  getForms: (params) => api.get('/api/surveys', { params }),
+  getForm: (id) => api.get(`/api/surveys/${id}`),
+  createForm: (data) => api.post('/api/surveys', data),
+  updateForm: (id, data) => api.put(`/api/surveys/${id}`, data),
+  deleteForm: (id) => api.delete(`/api/surveys/${id}`),
+  getResponses: (surveyId, params) => api.get(`/api/surveys/${surveyId}/responses`, { params }),
+  submitResponse: (surveyId, data) => api.post(`/api/surveys/${surveyId}/responses`, data),
+  getResponseRate: (surveyId) => api.get(`/api/surveys/${surveyId}/response-rate`),
+}
+
+export const questionnaireAPI = {
+  // Questionnaire CRUD
+  getQuestionnaires: (params) => api.get('/api/questionnaires', { params }),
+  getQuestionnaire: (id) => api.get(`/api/questionnaires/${id}`),
+  createQuestionnaire: (data) => api.post('/api/questionnaires', data),
+  updateQuestionnaire: (id, data) => api.put(`/api/questionnaires/${id}`, data),
+  deleteQuestionnaire: (id) => api.delete(`/api/questionnaires/${id}`),
+  
+  // Versioning and cloning
+  createVersion: (id, data) => api.post(`/api/questionnaires/${id}/versions`, data),
+  cloneQuestionnaire: (id, data) => api.post(`/api/questionnaires/${id}/clone`, data),
+  
+  // Question management within a questionnaire
+  addQuestion: (id, data) => api.post(`/api/questionnaires/${id}/questions`, data),
+  updateQuestion: (id, questionId, data) => api.put(`/api/questionnaires/${id}/questions/${questionId}`, data),
+  deleteQuestion: (id, questionId) => api.delete(`/api/questionnaires/${id}/questions/${questionId}`),
+  reorderQuestions: (id, order) => api.put(`/api/questionnaires/${id}/questions/reorder`, { order }),
 }
 
 export const surveyAPI = {
@@ -206,6 +276,16 @@ export const surveyAPI = {
   deleteSurvey: (id) => api.delete(`/api/surveys/${id}`),
   getResponses: (surveyId, params) => api.get(`/api/surveys/${surveyId}/responses`, { params }),
   submitResponse: (surveyId, data) => api.post(`/api/surveys/${surveyId}/responses`, data),
+  getResponseById: (responseId) => api.get(`/api/surveys/responses/${responseId}`),
+  updateResponse: (responseId, data) => api.put(`/api/surveys/responses/${responseId}`, data),
+  cloneSurvey: (id) => api.post(`/api/surveys/${id}/clone`),
+  getSurveyStatistics: (id) => api.get(`/api/surveys/${id}/statistics`),
+  
+  // Survey invitations
+  validateInvitation: (token) => api.get(`/api/surveys/invitations/by-token/${token}`),
+  getInvitations: (surveyId, params) => api.get(`/api/surveys/${surveyId}/invitations`, { params }),
+  createInvitations: (surveyId, data) => api.post(`/api/surveys/${surveyId}/invitations`, data),
+  resendInvitation: (invitationId) => api.post(`/api/surveys/invitations/${invitationId}/resend`),
   
   // Survey builder
   getDrafts: (params) => api.get('/api/survey/drafts', { params }),
@@ -244,69 +324,63 @@ export const surveyAPI = {
 
 export const analyticsAPI = {
   getDashboardStats: () => api.get('/api/analytics/dashboard'),
-  getCourseAnalytics: (courseId, params) => api.get(`/api/analytics/courses/${courseId}`, { params }),
-  getFormAnalytics: (formId, params) => api.get(`/api/analytics/forms/${formId}`, { params }),
-  getResponseTrends: (params) => api.get('/api/analytics/trends', { params }),
-  exportData: (type, params) => api.get(`/api/analytics/export/${type}`, { 
-    params, 
-    responseType: 'blob' 
-  }),
+  getOverview: (params) => api.get('/api/analytics/overview', { params }),
+  getCourseAnalytics: (courseId, params) => api.get(`/api/analytics/course/${courseId}`, { params }),
+  getSurveyAnalytics: (surveyId, params) => api.get(`/api/analytics/survey/${surveyId}`, { params }),
+  getUserAnalytics: (userId, params) => api.get(`/api/analytics/user/${userId}`, { params }),
+  getDepartmentAnalytics: (deptId, params) => api.get(`/api/analytics/department/${deptId}`, { params }),
+  getSurveyPerformance: (params) => api.get('/api/analytics/survey-performance', { params }),
+  getCourseAnalyticsMetrics: (params) => api.get('/api/analytics/course-analytics', { params }),
+  getUserEngagement: (params) => api.get('/api/analytics/user-engagement', { params }),
+  getTrends: (metricName, params) => api.get(`/api/analytics/trends/${metricName}`, { params }),
+  getResponseTrends: (params) => api.get('/api/analytics/trends/responses', { params }),
+  getFormAnalytics: (formId, params) => api.get(`/api/analytics/survey/${formId}`, { params }),
+  getComparison: (params) => api.get('/api/analytics/comparison', { params }),
+  getRealTime: () => api.get('/api/analytics/real-time'),
+  getPipelineMetrics: (params) => api.get('/api/analytics/pipeline-metrics', { params }),
+  getUsageMetrics: (params) => api.get('/api/analytics/usage-metrics', { params }),
+  exportData: (params) => api.get('/api/analytics/export', { params, responseType: 'blob' }),
+  generateCustomReport: (data) => api.post('/api/analytics/reports/custom', data),
 }
 
 export const organizationAPI = {
   // Organization management
-  getOrganization: () => api.get('/api/organizations'),
-  createOrganization: (data) => api.post('/api/organizations', {
-    name: data.name,
-    type: data.type,
-    address: data.address,
-    contactInfo: data.contactInfo,
-    subscriptionTier: data.subscriptionTier,
-    maxUsers: data.maxUsers
-  }),
+  getOrganizations: (params) => api.get('/api/organizations', { params }),
+  getOrganization: (id) => api.get(`/api/organizations/${id}`),
+  createOrganization: (data) => api.post('/api/organizations', data),
   updateOrganization: (id, data) => api.put(`/api/organizations/${id}`, data),
   deleteOrganization: (id) => api.delete(`/api/organizations/${id}`),
   
-  // Organization users
-  getUsers: (orgId, params) => api.get(`/api/organizations/${orgId}/users`, { params }),
-  inviteUser: (orgId, data) => api.post(`/api/organizations/${orgId}/users/invite`, {
-    email: data.email,
-    role: data.role,
-    departmentId: data.departmentId
-  }),
-  removeUser: (orgId, userId) => api.delete(`/api/organizations/${orgId}/users/${userId}`),
-  updateUserRole: (orgId, userId, role) => api.put(`/api/organizations/${orgId}/users/${userId}/role`, { role }),
+  // Organization administrators
+  addAdministrator: (orgId, data) => api.post(`/api/organizations/${orgId}/administrators`, data),
+  removeAdministrator: (orgId, userId) => api.delete(`/api/organizations/${orgId}/administrators/${userId}`),
   
   // Organization settings
-  getSettings: (orgId) => api.get(`/api/organizations/${orgId}/settings`),
   updateSettings: (orgId, data) => api.put(`/api/organizations/${orgId}/settings`, data),
+  updateSubscription: (orgId, data) => api.put(`/api/organizations/${orgId}/subscription`, data),
   
-  // Organization analytics
-  getAnalytics: (orgId, params) => api.get(`/api/organizations/${orgId}/analytics`, { params }),
+  // Academic terms
+  addAcademicTerm: (orgId, data) => api.post(`/api/organizations/${orgId}/academic-terms`, data),
+  updateAcademicTerm: (orgId, termId, data) => api.put(`/api/organizations/${orgId}/academic-terms/${termId}`, data),
+  removeAcademicTerm: (orgId, termId) => api.delete(`/api/organizations/${orgId}/academic-terms/${termId}`),
+  
+  // Organization users (via /api/users endpoint)
+  getUsers: (params) => api.get('/api/users', { params }),
+  inviteUser: (data) => api.post('/api/invitations', data),
+  batchInvite: (data) => api.post('/api/invitations/batch', data),
 }
 
 export const departmentAPI = {
   // Department management
   getDepartments: (params) => api.get('/api/departments', { params }),
   getDepartment: (id) => api.get(`/api/departments/${id}`),
-  createDepartment: (data) => api.post('/api/departments', {
-    name: data.name,
-    code: data.code,
-    description: data.description,
-    organizationId: data.organizationId,
-    adminId: data.adminId,
-    settings: data.settings
-  }),
+  searchDepartments: (name) => api.get('/api/departments/search', { params: { name } }),
+  createDepartment: (data) => api.post('/api/departments', data),
   updateDepartment: (id, data) => api.put(`/api/departments/${id}`, data),
   deleteDepartment: (id) => api.delete(`/api/departments/${id}`),
-  
-  // Department users
-  getUsers: (deptId, params) => api.get(`/api/departments/${deptId}/users`, { params }),
-  assignUser: (deptId, userId) => api.post(`/api/departments/${deptId}/users`, { userId }),
-  removeUser: (deptId, userId) => api.delete(`/api/departments/${deptId}/users/${userId}`),
-  
-  // Department analytics
-  getAnalytics: (deptId, params) => api.get(`/api/departments/${deptId}/analytics`, { params }),
+  bulkCreateDepartments: (data) => api.post('/api/departments/bulk/create', data),
+  createDefaultDepartment: (data) => api.post('/api/departments/default/create', data),
+  transferMembers: (deptId, data) => api.post(`/api/departments/${deptId}/transfer-members`, data),
 }
 
 export const pipelineAPI = {
@@ -331,27 +405,39 @@ export const pipelineAPI = {
   createEvaluation: (pipelineId, data) => api.post(`/api/pipelines/${pipelineId}/evaluations`, data),
   updateEvaluation: (pipelineId, evalId, data) => api.put(`/api/pipelines/${pipelineId}/evaluations/${evalId}`, data),
   moveEvaluation: (pipelineId, evalId, stageId) => api.put(`/api/pipelines/${pipelineId}/evaluations/${evalId}/move`, { stageId }),
+  
+  // Pipeline lifecycle
+  clonePipeline: (id, data) => api.post(`/api/pipelines/${id}/clone`, data),
+  activatePipeline: (id) => api.put(`/api/pipelines/${id}/activate`),
+  archivePipeline: (id) => api.put(`/api/pipelines/${id}/archive`),
+
+  // Pipeline triggers
+  getTriggers: (params) => api.get('/api/pipeline-triggers', { params }),
+  getTriggersByPipeline: (pipelineId, params) => api.get(`/api/pipeline-triggers/pipeline/${pipelineId}`, { params }),
+  createTrigger: (data) => api.post('/api/pipeline-triggers', data),
+  getTrigger: (triggerId) => api.get(`/api/pipeline-triggers/${triggerId}`),
+  updateTrigger: (triggerId, data) => api.put(`/api/pipeline-triggers/${triggerId}`, data),
+  deleteTrigger: (triggerId) => api.delete(`/api/pipeline-triggers/${triggerId}`),
+  toggleTrigger: (triggerId, enabled) => api.patch(`/api/pipeline-triggers/${triggerId}/toggle`, { enabled }),
+  executeTrigger: (triggerId, context) => api.post(`/api/pipeline-triggers/${triggerId}/execute`, { context }),
+  getTriggerHistory: (triggerId, params) => api.get(`/api/pipeline-triggers/${triggerId}/history`, { params }),
 }
 
 export const notificationAPI = {
-  // Notification management
-  getTemplates: (params) => api.get('/api/notifications/templates', { params }),
-  getTemplate: (id) => api.get(`/api/notifications/templates/${id}`),
-  createTemplate: (data) => api.post('/api/notifications/templates', data),
-  updateTemplate: (id, data) => api.put(`/api/notifications/templates/${id}`, data),
-  deleteTemplate: (id) => api.delete(`/api/notifications/templates/${id}`),
+  // User notifications
+  getNotifications: (params) => api.get('/api/notifications', { params }),
+  getNotification: (id) => api.get(`/api/notifications/${id}`),
+  getUnreadCount: () => api.get('/api/notifications/unread/count'),
+  markAsRead: (id) => api.patch(`/api/notifications/${id}/read`),
+  markAllAsRead: () => api.patch('/api/notifications/read/all'),
+  archiveNotification: (id) => api.patch(`/api/notifications/${id}/archive`),
+  deleteNotification: (id) => api.delete(`/api/notifications/${id}`),
+  deleteAllNotifications: () => api.delete('/api/notifications'),
   
-  // Send notifications
-  send: (data) => api.post('/api/notifications/send', {
-    templateId: data.templateId,
-    recipients: data.recipients,
-    variables: data.variables,
-    scheduledFor: data.scheduledFor
-  }),
-  
-  // Notification logs
-  getLogs: (params) => api.get('/api/notifications/logs', { params }),
-  getDeliveryStats: (params) => api.get('/api/notifications/delivery-stats', { params }),
+  // Create notifications (admin)
+  createNotification: (data) => api.post('/api/notifications', data),
+  createBulkNotifications: (data) => api.post('/api/notifications/bulk', data),
+  createFromTemplate: (data) => api.post('/api/notifications/template', data),
 }
 
 export const adminAPI = {
@@ -378,13 +464,17 @@ export const adminAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
-  bulkExport: (params) => api.get('/api/admin/bulk-operations/export', { 
-    params,
+  bulkExport: (data) => api.post('/api/admin/bulk-operations/export', data, {
     responseType: 'blob'
   }),
   
   // Audit logs
-  getAuditLogs: (params) => api.get('/api/admin/audit-logs', { params }),
+  getAuditLogs: (params) => api.get('/api/audit-logs', { params }),
+  
+  // Import rollback
+  getImportHistory: (params) => api.get('/api/admin/imports', { params }),
+  getImportBatch: (batchId) => api.get(`/api/admin/imports/${batchId}`),
+  rollbackImport: (batchId) => api.post(`/api/admin/imports/${batchId}/rollback`),
   
   // Question bank management
   uploadQuestions: (file) => {
@@ -396,11 +486,29 @@ export const adminAPI = {
   },
 }
 
+export const aiAPI = {
+  // Growth Plans
+  generateGrowthPlan: (data) => api.post('/api/ai/growth-plans', data),
+  generateForInstructor: (instructorId, data) => api.post(`/api/ai/growth-plans/${instructorId}`, data),
+  getGrowthPlans: (params) => api.get('/api/ai/growth-plans', { params }),
+  getInstructorPlans: (instructorId, params) => api.get(`/api/ai/growth-plans/instructor/${instructorId}`, { params }),
+  getGrowthPlan: (planId) => api.get(`/api/ai/growth-plans/${planId}`),
+  updateMilestone: (planId, milestoneIndex, status) => api.patch(`/api/ai/growth-plans/${planId}/milestones/${milestoneIndex}`, { status }),
+
+  // Sentiment Analysis
+  analyzeSentiment: (data) => api.post('/api/ai/sentiment', data),
+
+  // Organization AI Analytics
+  getOrgAIAnalytics: () => api.get('/api/ai/organization-analytics'),
+  getOrgAIAnalyticsById: (orgId) => api.get(`/api/ai/organization-analytics/${orgId}`),
+}
+
 export const billingAPI = {
   // Subscription management
   getSubscription: () => api.get('/api/billing/subscription'),
-  updateSubscription: (data) => api.put('/api/billing/subscription', data),
-  cancelSubscription: () => api.post('/api/billing/subscription/cancel'),
+  upgradeSubscription: (data) => api.put('/api/billing/subscription/upgrade', data),
+  downgradeSubscription: (data) => api.put('/api/billing/subscription/downgrade', data),
+  cancelSubscription: () => api.put('/api/billing/subscription/cancel'),
   
   // Payment methods
   getPaymentMethods: () => api.get('/api/billing/payment-methods'),
@@ -410,7 +518,7 @@ export const billingAPI = {
   // Invoices
   getInvoices: (params) => api.get('/api/billing/invoices', { params }),
   getInvoice: (id) => api.get(`/api/billing/invoices/${id}`),
-  downloadInvoice: (id) => api.get(`/api/billing/invoices/${id}/download`, { responseType: 'blob' }),
+  downloadInvoice: (id) => api.get(`/api/billing/invoices/${id}/pdf`, { responseType: 'blob' }),
 }
 
 export default api

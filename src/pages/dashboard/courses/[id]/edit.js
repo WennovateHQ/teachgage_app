@@ -4,7 +4,7 @@ import Head from 'next/head'
 import Link from 'next/link'
 import DashboardLayout from '../../../../components/layout/DashboardLayout'
 import { useAuth } from '../../../../contexts/AuthContext'
-import { getDemoCourseById } from '../../../../data/demoData'
+import { courseAPI } from '../../../../utils/api'
 import { 
   ArrowLeft,
   Save,
@@ -13,7 +13,9 @@ import {
   Users,
   BookOpen,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Plus,
+  Tag
 } from 'lucide-react'
 
 export default function EditCoursePage() {
@@ -34,30 +36,43 @@ export default function EditCoursePage() {
     maxStudents: '',
     status: 'draft',
     category: '',
+    tags: [],
+    tagInput: '',
     prerequisites: '',
     learningObjectives: ''
   })
 
   useEffect(() => {
-    if (id) {
-      const courseData = getDemoCourseById(id)
-      if (courseData) {
-        setCourse(courseData)
-        setFormData({
-          title: courseData.title || '',
-          description: courseData.description || '',
-          code: courseData.code || '',
-          startDate: courseData.startDate ? courseData.startDate.split('T')[0] : '',
-          endDate: courseData.endDate ? courseData.endDate.split('T')[0] : '',
-          maxStudents: courseData.maxStudents?.toString() || '',
-          status: courseData.status || 'draft',
-          category: courseData.category || '',
-          prerequisites: courseData.prerequisites || '',
-          learningObjectives: courseData.learningObjectives || ''
-        })
+    const loadCourse = async () => {
+      if (!id) return;
+      setIsLoading(true);
+      try {
+        const response = await courseAPI.getCourse(id);
+        const courseData = response.data?.data || response.data;
+        if (courseData) {
+          setCourse({ ...courseData, id: courseData.id || courseData._id });
+          setFormData({
+            title: courseData.name || courseData.title || '',
+            description: courseData.description || '',
+            code: courseData.code || '',
+            startDate: courseData.startDate ? courseData.startDate.split('T')[0] : '',
+            endDate: courseData.endDate ? courseData.endDate.split('T')[0] : '',
+            maxStudents: (courseData.capacity || courseData.maxStudents)?.toString() || '',
+            status: courseData.status || 'draft',
+            category: courseData.category || '',
+            tags: Array.isArray(courseData.tags) ? courseData.tags : [],
+            tagInput: '',
+            prerequisites: Array.isArray(courseData.prerequisites) ? courseData.prerequisites.join(', ') : (courseData.metadata?.prerequisites || courseData.prerequisites || ''),
+            learningObjectives: Array.isArray(courseData.objectives) ? courseData.objectives.join(', ') : (courseData.metadata?.learningObjectives || courseData.learningObjectives || '')
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load course:', error);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false)
-    }
+    };
+    loadCourse();
   }, [id])
 
   if (authLoading || isLoading) {
@@ -118,18 +133,17 @@ export default function EditCoursePage() {
     }
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      setMessage({ type: 'success', text: 'Course updated successfully!' })
+      await courseAPI.updateCourse(id, formData);
+      setMessage({ type: 'success', text: 'Course updated successfully!' });
       
-      // Redirect after successful save
       setTimeout(() => {
-        router.push(`/dashboard/courses/${id}`)
-      }, 2000)
+        router.push(`/dashboard/courses/${id}`);
+      }, 1500);
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update course. Please try again.' })
+      console.error('Failed to update course:', error);
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to update course. Please try again.' });
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
   }
 
@@ -140,11 +154,11 @@ export default function EditCoursePage() {
   return (
     <>
       <Head>
-        <title>Edit {course.title} - TeachGage</title>
+        <title>Edit {course.name || course.title} - TeachGage</title>
         <meta name="description" content={`Edit course: ${course.title}`} />
       </Head>
 
-      <DashboardLayout title={`Edit ${course.title}`}>
+      <DashboardLayout title={`Edit ${course.name || course.title}`}>
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Breadcrumb */}
           <nav className="flex items-center space-x-2 text-sm text-teachgage-navy">
@@ -152,7 +166,7 @@ export default function EditCoursePage() {
             <span>/</span>
             <Link href="/dashboard/courses" className="hover:text-teachgage-blue">Courses</Link>
             <span>/</span>
-            <Link href={`/dashboard/courses/${id}`} className="hover:text-teachgage-blue">{course.title}</Link>
+            <Link href={`/dashboard/courses/${id}`} className="hover:text-teachgage-blue">{course.name || course.title}</Link>
             <span>/</span>
             <span className="text-teachgage-blue font-medium">Edit</span>
           </nav>
@@ -251,12 +265,18 @@ export default function EditCoursePage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
                     >
                       <option value="">Select a category</option>
-                      <option value="computer-science">Computer Science</option>
                       <option value="mathematics">Mathematics</option>
-                      <option value="business">Business</option>
+                      <option value="science">Science</option>
+                      <option value="technology">Technology</option>
                       <option value="engineering">Engineering</option>
                       <option value="arts">Arts & Humanities</option>
-                      <option value="science">Science</option>
+                      <option value="business">Business & Management</option>
+                      <option value="health">Health & Medicine</option>
+                      <option value="education">Education</option>
+                      <option value="social_sciences">Social Sciences</option>
+                      <option value="vocational">Vocational & Technical</option>
+                      <option value="coaching">Coaching & Development</option>
+                      <option value="other">Other</option>
                     </select>
                   </div>
 
@@ -275,6 +295,65 @@ export default function EditCoursePage() {
                       <option value="archived">Archived</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="mt-6">
+                  <label className="block text-sm font-medium text-teachgage-navy mb-2">
+                    <Tag className="inline w-4 h-4 mr-1" />
+                    Tags
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={formData.tagInput}
+                      onChange={(e) => setFormData(prev => ({ ...prev, tagInput: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && formData.tagInput.trim()) {
+                          e.preventDefault();
+                          if (!formData.tags.includes(formData.tagInput.trim())) {
+                            setFormData(prev => ({
+                              ...prev,
+                              tags: [...prev.tags, prev.tagInput.trim()],
+                              tagInput: ''
+                            }));
+                          }
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
+                      placeholder="Type a tag & press Enter..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (formData.tagInput.trim() && !formData.tags.includes(formData.tagInput.trim())) {
+                          setFormData(prev => ({
+                            ...prev,
+                            tags: [...prev.tags, prev.tagInput.trim()],
+                            tagInput: ''
+                          }));
+                        }
+                      }}
+                      className="px-3 py-2 bg-teachgage-blue text-white rounded-lg hover:bg-teachgage-medium-blue text-sm"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {formData.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {formData.tags.map((tag, i) => (
+                        <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, tags: prev.tags.filter((_, idx) => idx !== i) }))}
+                            className="ml-1 text-blue-600 hover:text-blue-800"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 

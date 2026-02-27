@@ -15,7 +15,8 @@ import {
   Users, 
   Calendar,
   BookOpen,
-  Eye
+  Eye,
+  Tag
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -24,6 +25,7 @@ export default function CoursesPage() {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [filterCategory, setFilterCategory] = useState('all')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [courseToDelete, setCourseToDelete] = useState(null)
 
@@ -65,19 +67,43 @@ export default function CoursesPage() {
   }
 
   // Ensure courses is always an array - handle the nested data structure
-  const courses = Array.isArray(coursesData?.data?.courses) 
-    ? coursesData.data.courses 
+  // API response: { success: true, data: [...courses...], pagination: {...} }
+  // Axios wraps this in: { data: { success, data, pagination }, status, ... }
+  const rawCourses = Array.isArray(coursesData?.data?.data) 
+    ? coursesData.data.data 
     : Array.isArray(coursesData?.data) 
       ? coursesData.data 
       : Array.isArray(coursesData) 
         ? coursesData 
         : []
+  
+  // Normalize courses to ensure each has an 'id' field (MongoDB returns _id)
+  const courses = rawCourses.map(course => ({
+    ...course,
+    id: course._id || course.id
+  }))
+
+  const CATEGORY_LABELS = {
+    mathematics: 'Mathematics',
+    science: 'Science',
+    technology: 'Technology',
+    engineering: 'Engineering',
+    arts: 'Arts & Humanities',
+    business: 'Business & Management',
+    health: 'Health & Medicine',
+    education: 'Education',
+    social_sciences: 'Social Sciences',
+    vocational: 'Vocational & Technical',
+    coaching: 'Coaching & Development',
+    other: 'Other'
+  }
 
   const filteredCourses = courses.filter(course => {
     const matchesSearch = (course.name || course.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          course.description?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesFilter = filterStatus === 'all' || course.status === filterStatus
-    return matchesSearch && matchesFilter
+    const matchesCategory = filterCategory === 'all' || course.category === filterCategory
+    return matchesSearch && matchesFilter && matchesCategory
   })
 
   return (
@@ -129,6 +155,19 @@ export default function CoursesPage() {
                   <option value="active">Active</option>
                   <option value="draft">Draft</option>
                   <option value="archived">Archived</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Tag className="h-4 w-4 text-gray-400" />
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
+                >
+                  <option value="all">All Categories</option>
+                  {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -203,9 +242,27 @@ export default function CoursesPage() {
                     <h3 className="font-semibold text-lg text-teachgage-blue mb-2 line-clamp-1">
                       {course.name || course.title}
                     </h3>
-                    <p className="text-teachgage-navy text-sm mb-4 line-clamp-2">
+                    <p className="text-teachgage-navy text-sm mb-3 line-clamp-2">
                       {course.description || 'No description available'}
                     </p>
+
+                    {(course.category || (course.tags && course.tags.length > 0)) && (
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {course.category && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            {CATEGORY_LABELS[course.category] || course.category}
+                          </span>
+                        )}
+                        {course.tags?.slice(0, 3).map((tag, i) => (
+                          <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {tag}
+                          </span>
+                        ))}
+                        {course.tags?.length > 3 && (
+                          <span className="text-xs text-gray-500">+{course.tags.length - 3}</span>
+                        )}
+                      </div>
+                    )}
                     
                     <div className="flex items-center justify-between text-sm text-teachgage-navy mb-4">
                       <div className="flex items-center">

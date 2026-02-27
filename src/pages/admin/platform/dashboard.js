@@ -17,6 +17,7 @@ import {
   Globe,
   Shield
 } from 'lucide-react'
+import { analyticsAPI } from '../../../utils/api'
 
 export default function PlatformDashboard() {
   const router = useRouter()
@@ -29,24 +30,28 @@ export default function PlatformDashboard() {
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
 
+  const [recentActivity, setRecentActivity] = useState([])
+  const [systemAlerts, setSystemAlerts] = useState([])
+
   useEffect(() => {
-    // Simulate API call for platform stats
     const fetchStats = async () => {
       try {
-        // Demo data for platform admin
+        const response = await analyticsAPI.getDashboardStats()
+        const data = response.data?.data || response.data || {}
         setStats({
-          totalOrganizations: 47,
-          totalUsers: 1247,
-          activeSurveys: 156,
-          systemHealth: 98.5
+          totalOrganizations: data.totalOrganizations || 0,
+          totalUsers: data.totalUsers || 0,
+          activeSurveys: data.activeSurveys || 0,
+          systemHealth: data.systemHealth || 0
         })
+        setRecentActivity(data.recentActivity || [])
+        setSystemAlerts(data.systemAlerts || [])
       } catch (error) {
         console.error('Error fetching platform stats:', error)
       } finally {
         setLoading(false)
       }
     }
-
     fetchStats()
   }, [])
 
@@ -85,56 +90,6 @@ export default function PlatformDashboard() {
     }
   ]
 
-  const systemAlerts = [
-    {
-      id: 1,
-      type: 'warning',
-      title: 'High CPU Usage',
-      message: 'Server cluster experiencing elevated CPU usage (85%)',
-      time: '2 minutes ago',
-      icon: AlertTriangle
-    },
-    {
-      id: 2,
-      type: 'success',
-      title: 'Backup Completed',
-      message: 'Daily database backup completed successfully',
-      time: '1 hour ago',
-      icon: CheckCircle
-    },
-    {
-      id: 3,
-      type: 'info',
-      title: 'New Organization',
-      message: 'University of California joined the platform',
-      time: '3 hours ago',
-      icon: Building2
-    }
-  ]
-
-  const recentActivity = [
-    {
-      id: 1,
-      action: 'Organization Created',
-      details: 'Stanford University - 50 user limit',
-      user: 'Platform Admin',
-      time: '10 minutes ago'
-    },
-    {
-      id: 2,
-      action: 'Bulk User Import',
-      details: '245 users imported for MIT',
-      user: 'System',
-      time: '1 hour ago'
-    },
-    {
-      id: 3,
-      action: 'System Maintenance',
-      details: 'Database optimization completed',
-      user: 'System',
-      time: '2 hours ago'
-    }
-  ]
 
   if (loading) {
     return (
@@ -195,26 +150,29 @@ export default function PlatformDashboard() {
               <Shield className="h-5 w-5 text-gray-400" />
             </div>
             <div className="space-y-4">
-              {systemAlerts.map((alert) => {
-                const IconComponent = alert.icon
-                const alertColors = {
-                  warning: 'text-yellow-600 bg-yellow-100',
-                  success: 'text-green-600 bg-green-100',
-                  info: 'text-blue-600 bg-blue-100'
-                }
-                return (
-                  <div key={alert.id} className="flex items-start space-x-3 p-3 rounded-lg bg-gray-50">
-                    <div className={`p-2 rounded-full ${alertColors[alert.type]}`}>
-                      <IconComponent className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{alert.title}</p>
-                      <p className="text-sm text-gray-600">{alert.message}</p>
-                      <p className="text-xs text-gray-500 mt-1">{alert.time}</p>
-                    </div>
+              {systemAlerts.length > 0 ? systemAlerts.map((alert, index) => (
+                <div key={alert.id || index} className="flex items-start space-x-3 p-3 rounded-lg bg-gray-50">
+                  <div className={`p-2 rounded-full ${
+                    alert.type === 'warning' ? 'text-yellow-600 bg-yellow-100' :
+                    alert.type === 'success' ? 'text-green-600 bg-green-100' :
+                    'text-blue-600 bg-blue-100'
+                  }`}>
+                    <AlertTriangle className="h-4 w-4" />
                   </div>
-                )
-              })}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">{alert.title}</p>
+                    <p className="text-sm text-gray-600">{alert.message}</p>
+                    <p className="text-xs text-gray-500 mt-1">{alert.time || (alert.createdAt ? new Date(alert.createdAt).toLocaleString() : '')}</p>
+                  </div>
+                </div>
+              )) : (
+                <div className="flex items-center space-x-3 p-3 rounded-lg bg-gray-50">
+                  <div className="p-2 rounded-full text-green-600 bg-green-100">
+                    <CheckCircle className="h-4 w-4" />
+                  </div>
+                  <p className="text-sm text-gray-600">No active alerts</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -261,22 +219,22 @@ export default function PlatformDashboard() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Platform Activity</h3>
           <div className="space-y-4">
-            {recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+            {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
+              <div key={activity.id || index} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
                 <div className="flex-shrink-0">
                   <Activity className="h-8 w-8 text-teachgage-blue" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                  <p className="text-sm text-gray-600">{activity.details}</p>
+                  <p className="text-sm font-medium text-gray-900">{activity.action || activity.title || 'Activity'}</p>
+                  <p className="text-sm text-gray-600">{activity.details || activity.description || ''}</p>
                   <div className="flex items-center mt-1 text-xs text-gray-500">
-                    <span>By {activity.user}</span>
-                    <span className="mx-2">•</span>
-                    <span>{activity.time}</span>
+                    <span>{activity.time || (activity.createdAt ? new Date(activity.createdAt).toLocaleString() : '')}</span>
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <p className="text-sm text-gray-500 text-center py-4">No recent activity</p>
+            )}
           </div>
         </div>
 

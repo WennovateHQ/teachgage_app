@@ -11,15 +11,26 @@ import {
   FileText,
   Filter
 } from 'lucide-react'
+import { analyticsAPI } from '../../../utils/api'
 
 export default function OrganizationReportsPage() {
   const [loading, setLoading] = useState(true)
   const [selectedReport, setSelectedReport] = useState('overview')
   const [dateRange, setDateRange] = useState('last-30-days')
+  const [reportData, setReportData] = useState(null)
 
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => setLoading(false), 1000)
+    const fetchReportData = async () => {
+      try {
+        const response = await analyticsAPI.getDashboardStats()
+        setReportData(response.data?.data || response.data || {})
+      } catch (error) {
+        console.error('Error fetching report data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchReportData()
   }, [])
 
   const reportTypes = [
@@ -29,24 +40,34 @@ export default function OrganizationReportsPage() {
     { id: 'engagement', name: 'Engagement Metrics', icon: TrendingUp }
   ]
 
-  const handleExportReport = () => {
-    // Generate mock CSV data
-    const csvData = [
-      ['Metric', 'Value', 'Change'],
-      ['Total Users', '156', '+15%'],
-      ['Active Courses', '34', '+12%'],
-      ['Completed Surveys', '89', '+28%'],
-      ['Department Count', '8', '+2']
-    ]
-    
-    const csvContent = csvData.map(row => row.join(',')).join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `organization-report-${selectedReport}-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    window.URL.revokeObjectURL(url)
+  const handleExportReport = async () => {
+    try {
+      const response = await analyticsAPI.exportData({ type: selectedReport, dateRange })
+      const blob = new Blob([response.data], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `organization-report-${selectedReport}-${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Export error:', error)
+      // Fallback: generate CSV from available data
+      const csvData = [
+        ['Metric', 'Value'],
+        ['Total Users', reportData?.totalUsers || 0],
+        ['Active Courses', reportData?.activeCourses || 0],
+        ['Completed Surveys', reportData?.completedSurveys || 0]
+      ]
+      const csvContent = csvData.map(row => row.join(',')).join('\n')
+      const blob = new Blob([csvContent], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `organization-report-${selectedReport}-${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+      window.URL.revokeObjectURL(url)
+    }
   }
 
   if (loading) {
@@ -132,8 +153,7 @@ export default function OrganizationReportsPage() {
                         <Users className="h-8 w-8 text-blue-600 mr-3" />
                         <div>
                           <p className="text-sm text-gray-600">Total Users</p>
-                          <p className="text-2xl font-bold text-gray-900">156</p>
-                          <p className="text-sm text-green-600">+15% from last month</p>
+                          <p className="text-2xl font-bold text-gray-900">{reportData?.totalUsers || 0}</p>
                         </div>
                       </div>
                     </div>
@@ -142,8 +162,7 @@ export default function OrganizationReportsPage() {
                         <BookOpen className="h-8 w-8 text-green-600 mr-3" />
                         <div>
                           <p className="text-sm text-gray-600">Active Courses</p>
-                          <p className="text-2xl font-bold text-gray-900">34</p>
-                          <p className="text-sm text-green-600">+12% from last month</p>
+                          <p className="text-2xl font-bold text-gray-900">{reportData?.activeCourses || 0}</p>
                         </div>
                       </div>
                     </div>
@@ -152,12 +171,7 @@ export default function OrganizationReportsPage() {
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h4 className="font-medium text-gray-900 mb-2">Department Performance</h4>
                     <div className="space-y-2">
-                      {[
-                        { name: 'Computer Science', completion: 92 },
-                        { name: 'Engineering', completion: 87 },
-                        { name: 'Mathematics', completion: 95 },
-                        { name: 'Physics', completion: 89 }
-                      ].map((dept, index) => (
+                      {(reportData?.departmentPerformance || []).map((dept, index) => (
                         <div key={index} className="flex items-center justify-between">
                           <span className="text-sm text-gray-700">{dept.name}</span>
                           <div className="flex items-center">
@@ -182,10 +196,9 @@ export default function OrganizationReportsPage() {
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h4 className="font-medium text-gray-900 mb-2">User Activity Summary</h4>
                     <ul className="space-y-2 text-sm text-gray-700">
-                      <li>• Active users: 142 (91% of total)</li>
-                      <li>• New registrations: 23</li>
-                      <li>• Course completions: 67</li>
-                      <li>• Survey responses: 234</li>
+                      <li>- Active users: {reportData?.activeUsers || 0}</li>
+                      <li>- Total users: {reportData?.totalUsers || 0}</li>
+                      <li>- Completed surveys: {reportData?.completedSurveys || 0}</li>
                     </ul>
                   </div>
                 </div>
@@ -197,10 +210,8 @@ export default function OrganizationReportsPage() {
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h4 className="font-medium text-gray-900 mb-2">Course Performance</h4>
                     <ul className="space-y-2 text-sm text-gray-700">
-                      <li>• Total courses: 34</li>
-                      <li>• Average completion rate: 88%</li>
-                      <li>• Most popular course: Introduction to Computer Science</li>
-                      <li>• Highest rated course: Advanced Mathematics</li>
+                      <li>- Total courses: {reportData?.activeCourses || 0}</li>
+                      <li>- Average response rate: {reportData?.responseRate || 'N/A'}%</li>
                     </ul>
                   </div>
                 </div>
@@ -212,10 +223,9 @@ export default function OrganizationReportsPage() {
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h4 className="font-medium text-gray-900 mb-2">Engagement Metrics</h4>
                     <ul className="space-y-2 text-sm text-gray-700">
-                      <li>• Average session duration: 24 minutes</li>
-                      <li>• Daily active users: 89</li>
-                      <li>• Survey response rate: 76%</li>
-                      <li>• Course interaction rate: 82%</li>
+                      <li>- Active users: {reportData?.activeUsers || 0}</li>
+                      <li>- Survey response rate: {reportData?.responseRate || 'N/A'}%</li>
+                      <li>- Completed surveys: {reportData?.completedSurveys || 0}</li>
                     </ul>
                   </div>
                 </div>
@@ -230,19 +240,19 @@ export default function OrganizationReportsPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Response Rate</span>
-                    <span className="text-sm font-medium text-gray-900">76%</span>
+                    <span className="text-sm font-medium text-gray-900">{reportData?.responseRate || 'N/A'}%</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Avg. Course Rating</span>
-                    <span className="text-sm font-medium text-gray-900">4.2/5</span>
+                    <span className="text-sm text-gray-600">Total Users</span>
+                    <span className="text-sm font-medium text-gray-900">{reportData?.totalUsers || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Active Instructors</span>
-                    <span className="text-sm font-medium text-gray-900">142</span>
+                    <span className="text-sm text-gray-600">Active Courses</span>
+                    <span className="text-sm font-medium text-gray-900">{reportData?.activeCourses || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Completion Rate</span>
-                    <span className="text-sm font-medium text-gray-900">88%</span>
+                    <span className="text-sm text-gray-600">Completed Surveys</span>
+                    <span className="text-sm font-medium text-gray-900">{reportData?.completedSurveys || 0}</span>
                   </div>
                 </div>
               </div>

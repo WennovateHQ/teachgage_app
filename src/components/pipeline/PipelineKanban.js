@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { 
   DndContext, 
   closestCenter,
@@ -28,141 +28,51 @@ import {
 import toast from 'react-hot-toast'
 import KanbanColumn from './KanbanColumn'
 import EvaluationCard from './EvaluationCard'
+import { pipelineAPI } from '../../utils/api'
 
 export default function PipelineKanban({ pipelineId }) {
   const [pipeline, setPipeline] = useState({
     id: pipelineId,
-    name: 'Standard Evaluation Pipeline',
-    stages: [
-      {
-        id: 'stage_1',
-        name: 'Planning',
-        color: 'bg-blue-500',
-        order: 0,
-        evaluations: [
-          {
-            id: 'evaluation_1',
-            courseId: 'course_1',
-            courseName: 'Introduction to Psychology',
-            instructor: 'Dr. Sarah Johnson',
-            currentStage: 'stage_1',
-            progress: 10,
-            dueDate: '2024-02-15',
-            status: 'active',
-            priority: 'high',
-            lastUpdated: '2024-01-10T10:30:00Z'
-          },
-          {
-            id: 'evaluation_2',
-            courseId: 'course_2',
-            courseName: 'Advanced Mathematics',
-            instructor: 'Prof. Michael Chen',
-            currentStage: 'stage_1',
-            progress: 25,
-            dueDate: '2024-02-20',
-            status: 'active',
-            priority: 'medium',
-            lastUpdated: '2024-01-12T14:15:00Z'
-          }
-        ]
-      },
-      {
-        id: 'stage_2',
-        name: 'Survey Creation',
-        color: 'bg-yellow-500',
-        order: 1,
-        evaluations: [
-          {
-            id: 'evaluation_3',
-            courseId: 'course_3',
-            courseName: 'Digital Marketing',
-            instructor: 'Dr. Emily Rodriguez',
-            currentStage: 'stage_2',
-            progress: 45,
-            dueDate: '2024-02-18',
-            status: 'active',
-            priority: 'high',
-            lastUpdated: '2024-01-14T09:20:00Z'
-          }
-        ]
-      },
-      {
-        id: 'stage_3',
-        name: 'Data Collection',
-        color: 'bg-orange-500',
-        order: 2,
-        evaluations: [
-          {
-            id: 'evaluation_4',
-            courseId: 'course_4',
-            courseName: 'Software Engineering',
-            instructor: 'Dr. James Wilson',
-            currentStage: 'stage_3',
-            progress: 70,
-            dueDate: '2024-02-12',
-            status: 'active',
-            priority: 'medium',
-            lastUpdated: '2024-01-15T16:45:00Z'
-          },
-          {
-            id: 'evaluation_5',
-            courseId: 'course_5',
-            courseName: 'Data Science Fundamentals',
-            instructor: 'Prof. Lisa Anderson',
-            currentStage: 'stage_3',
-            progress: 65,
-            dueDate: '2024-02-25',
-            status: 'active',
-            priority: 'low',
-            lastUpdated: '2024-01-16T11:30:00Z'
-          }
-        ]
-      },
-      {
-        id: 'stage_4',
-        name: 'Analysis',
-        color: 'bg-purple-500',
-        order: 3,
-        evaluations: [
-          {
-            id: 'evaluation_6',
-            courseId: 'course_6',
-            courseName: 'Business Analytics',
-            instructor: 'Dr. Robert Taylor',
-            currentStage: 'stage_4',
-            progress: 85,
-            dueDate: '2024-02-10',
-            status: 'active',
-            priority: 'high',
-            lastUpdated: '2024-01-17T13:20:00Z'
-          }
-        ]
-      },
-      {
-        id: 'stage_5',
-        name: 'Completed',
-        color: 'bg-green-500',
-        order: 4,
-        evaluations: [
-          {
-            id: 'evaluation_7',
-            courseId: 'course_7',
-            courseName: 'Web Development',
-            instructor: 'Dr. Maria Garcia',
-            currentStage: 'stage_5',
-            progress: 100,
-            dueDate: '2024-01-30',
-            status: 'completed',
-            priority: 'medium',
-            lastUpdated: '2024-01-18T10:15:00Z'
-          }
-        ]
-      }
-    ]
+    name: '',
+    stages: []
   })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const [activeId, setActiveId] = useState(null)
   const [draggedEvaluation, setDraggedEvaluation] = useState(null)
+
+  useEffect(() => {
+    loadPipelineData()
+  }, [pipelineId])
+
+  const loadPipelineData = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const response = await pipelineAPI.getPipeline(pipelineId)
+      const data = response.data?.data || response.data
+      if (data) {
+        setPipeline({
+          id: data._id || data.id || pipelineId,
+          name: data.name || 'Pipeline',
+          stages: (data.stages || []).map(stage => ({
+            ...stage,
+            id: stage._id || stage.id,
+            evaluations: (stage.evaluations || []).map(ev => ({
+              ...ev,
+              id: ev._id || ev.id
+            }))
+          }))
+        })
+      }
+    } catch (err) {
+      console.error('Failed to load pipeline data:', err)
+      setError('Failed to load pipeline data. The pipeline feature may not be configured yet.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -278,15 +188,26 @@ export default function PipelineKanban({ pipelineId }) {
       })
     }
 
-    setActiveId(null)
-    setDraggedEvaluation(null)
-    
-    // Show success message
+    // Persist move to backend if moved to different stage
     if (activeContainer !== overContainer) {
       const overStage = pipeline.stages.find(s => s.id === overContainer)
-      toast.success(`Evaluation moved to ${overStage?.name}`)
+      
+      // Call API to persist the move
+      pipelineAPI.moveEvaluation(pipelineId, activeId, overContainer)
+        .then(() => {
+          toast.success(`Evaluation moved to ${overStage?.name}`)
+        })
+        .catch((err) => {
+          console.error('Failed to persist evaluation move:', err)
+          toast.error('Failed to save move. Please refresh the page.')
+          // Reload pipeline data to restore correct state
+          loadPipelineData()
+        })
     }
-  }, [pipeline.stages])
+
+    setActiveId(null)
+    setDraggedEvaluation(null)
+  }, [pipeline.stages, pipelineId])
 
   const findContainer = useCallback((id) => {
     // Check if it's a stage
@@ -308,57 +229,103 @@ export default function PipelineKanban({ pipelineId }) {
     return null
   }, [pipeline.stages])
 
-  const addNewEvaluation = useCallback((stageId) => {
-    const newEvaluation = {
-      id: `evaluation_${Date.now()}`,
-      courseId: `course_${Date.now()}`,
-      courseName: 'New Course Evaluation',
-      instructor: 'Instructor Name',
-      currentStage: stageId,
-      progress: 0,
-      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      status: 'active',
-      priority: 'medium',
-      lastUpdated: new Date().toISOString()
-    }
-
-    setPipeline(prev => ({
-      ...prev,
-      stages: prev.stages.map(stage => 
-        stage.id === stageId 
-          ? { ...stage, evaluations: [...stage.evaluations, newEvaluation] }
-          : stage
-      )
-    }))
-
-    toast.success('New evaluation added!')
-  }, [])
-
-  const updateEvaluation = useCallback((evaluationId, updates) => {
-    setPipeline(prev => ({
-      ...prev,
-      stages: prev.stages.map(stage => ({
-        ...stage,
-        evaluations: stage.evaluations.map(evaluation => 
-          evaluation.id === evaluationId 
-            ? { ...evaluation, ...updates, lastUpdated: new Date().toISOString() }
-            : evaluation
+  const addNewEvaluation = useCallback(async (stageId) => {
+    try {
+      const evalData = {
+        currentStage: stageId,
+        progress: 0,
+        status: 'active',
+        priority: 'medium',
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      }
+      const response = await pipelineAPI.createEvaluation(pipelineId, evalData)
+      const newEval = response.data?.data || response.data
+      setPipeline(prev => ({
+        ...prev,
+        stages: prev.stages.map(stage =>
+          stage.id === stageId
+            ? { ...stage, evaluations: [...stage.evaluations, { ...newEval, id: newEval._id || newEval.id }] }
+            : stage
         )
       }))
-    }))
-  }, [])
+      toast.success('New evaluation added!')
+    } catch (err) {
+      console.error('Failed to create evaluation:', err)
+      toast.error('Failed to create evaluation')
+    }
+  }, [pipelineId])
 
-  const deleteEvaluation = useCallback((evaluationId) => {
-    setPipeline(prev => ({
-      ...prev,
-      stages: prev.stages.map(stage => ({
-        ...stage,
-        evaluations: stage.evaluations.filter(evaluation => evaluation.id !== evaluationId)
+  const updateEvaluation = useCallback(async (evaluationId, updates) => {
+    try {
+      await pipelineAPI.updateEvaluation(pipelineId, evaluationId, updates)
+      setPipeline(prev => ({
+        ...prev,
+        stages: prev.stages.map(stage => ({
+          ...stage,
+          evaluations: stage.evaluations.map(evaluation =>
+            evaluation.id === evaluationId
+              ? { ...evaluation, ...updates, lastUpdated: new Date().toISOString() }
+              : evaluation
+          )
+        }))
       }))
-    }))
-    
-    toast.success('Evaluation deleted!')
-  }, [])
+    } catch (err) {
+      console.error('Failed to update evaluation:', err)
+      toast.error('Failed to update evaluation')
+    }
+  }, [pipelineId])
+
+  const deleteEvaluation = useCallback(async (evaluationId) => {
+    try {
+      await pipelineAPI.updateEvaluation(pipelineId, evaluationId, { status: 'deleted' })
+      setPipeline(prev => ({
+        ...prev,
+        stages: prev.stages.map(stage => ({
+          ...stage,
+          evaluations: stage.evaluations.filter(evaluation => evaluation.id !== evaluationId)
+        }))
+      }))
+      toast.success('Evaluation deleted!')
+    } catch (err) {
+      console.error('Failed to delete evaluation:', err)
+      toast.error('Failed to delete evaluation')
+    }
+  }, [pipelineId])
+
+  if (isLoading) {
+    return (
+      <div className="h-full bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teachgage-blue mx-auto"></div>
+          <p className="text-gray-600 mt-3">Loading pipeline...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="h-full bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-gray-900 mb-1">Pipeline Not Available</h3>
+          <p className="text-gray-600">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (pipeline.stages.length === 0) {
+    return (
+      <div className="h-full bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-gray-900 mb-1">No Pipeline Stages</h3>
+          <p className="text-gray-600">This pipeline has no stages configured yet. Create stages to start tracking evaluations.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="h-full bg-gray-50">

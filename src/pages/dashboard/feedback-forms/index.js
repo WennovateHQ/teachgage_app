@@ -68,14 +68,18 @@ export default function FeedbackFormsPage() {
     // You could add a toast notification here
   }
 
-  const forms = formsData?.data || []
+  // Handle different response structures from API
+  // react-query returns axios response, axios response.data contains backend response
+  // Backend returns: { success: true, data: [...surveys], pagination: {...} }
+  const forms = formsData?.data?.data || formsData?.data?.surveys || formsData?.data || []
+  console.log('Forms data:', formsData?.data, 'Parsed forms:', forms)
 
-  const filteredForms = forms.filter(form => {
-    const matchesSearch = form.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredForms = Array.isArray(forms) ? forms.filter(form => {
+    const matchesSearch = form.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          form.description?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesFilter = filterStatus === 'all' || form.status === filterStatus
     return matchesSearch && matchesFilter
-  })
+  }) : []
 
   return (
     <>
@@ -178,8 +182,10 @@ export default function FeedbackFormsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredForms.map((form) => (
-                <div key={form.id} className="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+              {filteredForms.map((form) => {
+                const formId = form.id || form._id
+                return (
+                <div key={formId} className="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
                   <div className="p-6">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -222,7 +228,7 @@ export default function FeedbackFormsPage() {
                         {form.status === 'active' && (
                           <>
                             <button 
-                              onClick={() => handleCopyLink(form.id)}
+                              onClick={() => handleCopyLink(formId)}
                               className="p-2 text-gray-400 hover:text-teachgage-blue transition-colors"
                               title="Copy form link"
                             >
@@ -234,19 +240,19 @@ export default function FeedbackFormsPage() {
                           </>
                         )}
                         
-                        <Link href={`/dashboard/feedback-forms/${form.id}?tab=analytics`}>
+                        <Link href={`/dashboard/feedback-forms/${formId}?tab=analytics`}>
                           <button className="p-2 text-gray-400 hover:text-teachgage-blue transition-colors">
                             <BarChart3 className="h-4 w-4" />
                           </button>
                         </Link>
                         
-                        <Link href={`/dashboard/feedback-forms/${form.id}`}>
+                        <Link href={`/dashboard/feedback-forms/${formId}`}>
                           <button className="p-2 text-gray-400 hover:text-teachgage-blue transition-colors">
                             <Eye className="h-4 w-4" />
                           </button>
                         </Link>
                         
-                        <Link href={`/dashboard/feedback-forms/${form.id}?tab=settings`}>
+                        <Link href={`/dashboard/feedback-forms/${formId}?tab=settings`}>
                           <button className="p-2 text-gray-400 hover:text-teachgage-blue transition-colors">
                             <Edit className="h-4 w-4" />
                           </button>
@@ -277,7 +283,8 @@ export default function FeedbackFormsPage() {
                     )}
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
