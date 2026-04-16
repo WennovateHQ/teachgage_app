@@ -157,20 +157,68 @@ export default function AIInsightsPage() {
           )}
 
           {!activePlan && !isGenerating && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-              <Brain className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-gray-700 mb-2">No Growth Plans Yet</h2>
-              <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                Generate your first AI-powered growth plan based on your evaluation data.
-                The AI will analyze responses, identify competency gaps, and create a personalized development roadmap.
-              </p>
-              <button
-                onClick={handleGenerate}
-                disabled={isGenerating}
-                className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
-              >
-                <Sparkles className="h-5 w-5 mr-2" /> Generate Growth Plan
-              </button>
+            <div className="space-y-6">
+              {/* How it works */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
+                <Brain className="h-16 w-16 text-purple-300 mx-auto mb-4" />
+                <h2 className="text-xl font-semibold text-gray-700 mb-2">AI-Powered Growth Plans</h2>
+                <p className="text-gray-500 mb-6 max-w-lg mx-auto">
+                  Generate a personalized professional development plan. The AI analyzes your evaluation feedback,
+                  identifies competency gaps, and creates SMART milestones with CEU tracking.
+                </p>
+                <button
+                  onClick={handleGenerate}
+                  disabled={isGenerating}
+                  className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+                >
+                  <Sparkles className="h-5 w-5 mr-2" /> Generate Growth Plan
+                </button>
+                <p className="text-xs text-gray-400 mt-3">
+                  No evaluation data yet? A starter plan will be generated to help you get started.
+                </p>
+              </div>
+
+              {/* How AI Insights works */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">How It Works</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="text-center">
+                    <div className="p-3 bg-blue-50 rounded-xl inline-block mb-3"><BarChart3 className="h-6 w-6 text-blue-600" /></div>
+                    <h4 className="font-medium text-gray-800 mb-1">1. Analyze Feedback</h4>
+                    <p className="text-sm text-gray-500">AI processes your survey responses using sentiment analysis to understand feedback themes.</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="p-3 bg-orange-50 rounded-xl inline-block mb-3"><Target className="h-6 w-6 text-orange-600" /></div>
+                    <h4 className="font-medium text-gray-800 mb-1">2. Identify Gaps</h4>
+                    <p className="text-sm text-gray-500">Scores are mapped across 6 competency domains to find areas needing improvement.</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="p-3 bg-green-50 rounded-xl inline-block mb-3"><TrendingUp className="h-6 w-6 text-green-600" /></div>
+                    <h4 className="font-medium text-gray-800 mb-1">3. Build Your Plan</h4>
+                    <p className="text-sm text-gray-500">SMART milestones are generated with CEU hours, resources, and success metrics.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Competency areas analyzed */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Competency Areas Analyzed</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { name: 'Communication', desc: 'Clarity, tone, and active listening' },
+                    { name: 'Subject Mastery', desc: 'Depth of knowledge and expertise' },
+                    { name: 'Student Engagement', desc: 'Participation and interaction' },
+                    { name: 'Session Planning', desc: 'Organization and preparation' },
+                    { name: 'Feedback & Assessment', desc: 'Quality and timeliness of feedback' },
+                    { name: 'Learning Environment', desc: 'Inclusivity and safety' }
+                  ].map((area, i) => (
+                    <div key={i} className="p-3 bg-gray-50 rounded-lg">
+                      <p className="font-medium text-gray-800 text-sm">{area.name}</p>
+                      <p className="text-xs text-gray-500">{area.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 

@@ -202,6 +202,153 @@ export default function SurveyResponsePage() {
           </div>
         )
 
+      case 'slider':
+      case 'opinion_scale':
+      case 'nps': {
+        const sliderMin = question.scale?.min ?? question.options?.min ?? 0
+        const sliderMax = question.scale?.max ?? question.options?.max ?? 10
+        const sliderVal = currentValue ?? Math.floor((sliderMin + sliderMax) / 2)
+        return (
+          <div className="space-y-4 max-w-lg mx-auto">
+            <input
+              type="range"
+              min={sliderMin}
+              max={sliderMax}
+              step={question.options?.step || 1}
+              value={sliderVal}
+              onChange={(e) => handleResponseChange(questionId, parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-teachgage-blue"
+            />
+            <div className="flex justify-between text-sm text-gray-500">
+              <span>{question.scale?.minLabel || question.options?.minLabel || sliderMin}</span>
+              <span className="text-lg font-bold text-teachgage-blue">{currentValue ?? '-'}</span>
+              <span>{question.scale?.maxLabel || question.options?.maxLabel || sliderMax}</span>
+            </div>
+          </div>
+        )
+      }
+
+      case 'likert': {
+        const statements = question.options?.statements || []
+        const scaleLabels = question.options?.scale || ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree']
+        return (
+          <div className="space-y-6">
+            {statements.map((statement, si) => (
+              <div key={si} className="space-y-3">
+                <p className="font-medium text-gray-700">{statement}</p>
+                <div className="grid grid-cols-5 gap-2">
+                  {scaleLabels.map((label, li) => (
+                    <button
+                      key={li}
+                      type="button"
+                      onClick={() => {
+                        const cur = currentValue || {}
+                        handleResponseChange(questionId, { ...cur, [si]: li })
+                      }}
+                      className={`p-2 text-xs rounded border-2 transition-colors ${
+                        (currentValue || {})[si] === li
+                          ? 'border-teachgage-blue bg-teachgage-blue text-white'
+                          : 'border-gray-300 hover:border-teachgage-blue'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      case 'matrix': {
+        const matrixRows = question.options?.rows || question.options?.statements || []
+        const matrixCols = question.options?.columns || question.options?.scale || ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree']
+        return (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-left p-3 border-b border-gray-200"></th>
+                  {matrixCols.map((col, i) => (
+                    <th key={i} className="p-3 text-center text-xs font-medium text-gray-600 border-b border-gray-200 min-w-[80px]">{col}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {matrixRows.map((row, ri) => (
+                  <tr key={ri} className={ri % 2 === 0 ? 'bg-gray-50' : ''}>
+                    <td className="p-3 text-sm font-medium text-gray-700">{row}</td>
+                    {matrixCols.map((_, ci) => (
+                      <td key={ci} className="p-3 text-center">
+                        <input
+                          type="radio"
+                          name={`matrix-${questionId}-${ri}`}
+                          checked={(currentValue || {})[ri] === ci}
+                          onChange={() => {
+                            const cur = currentValue || {}
+                            handleResponseChange(questionId, { ...cur, [ri]: ci })
+                          }}
+                          className="w-4 h-4 text-teachgage-blue focus:ring-teachgage-blue cursor-pointer"
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+
+      case 'rank_order': {
+        const rankItems = question.options?.choices || question.options || []
+        const ranked = currentValue || []
+        const unranked = rankItems.filter(item => !ranked.includes(typeof item === 'string' ? item : item.value || item.label))
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">Click items to rank them in order.</p>
+            {ranked.length > 0 && (
+              <div className="space-y-2">
+                {ranked.map((item, i) => (
+                  <div key={i} className="flex items-center p-3 bg-teachgage-blue text-white rounded-lg">
+                    <span className="w-6 h-6 flex items-center justify-center bg-white text-teachgage-blue rounded-full text-sm font-bold mr-3">{i + 1}</span>
+                    {item}
+                    <button onClick={() => handleResponseChange(questionId, ranked.filter((_, idx) => idx !== i))} className="ml-auto text-sm text-white/80 hover:text-white">Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {unranked.length > 0 && (
+              <div className="space-y-2">
+                {unranked.map((item, i) => {
+                  const val = typeof item === 'string' ? item : item.value || item.label
+                  return (
+                    <button key={i} onClick={() => handleResponseChange(questionId, [...ranked, val])} className="w-full text-left p-3 rounded-lg border-2 border-gray-300 hover:border-teachgage-blue transition-colors">
+                      {typeof item === 'string' ? item : item.label || item.value}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      case 'yes_no':
+        return (
+          <div className="flex justify-center space-x-4">
+            <button type="button" onClick={() => handleResponseChange(questionId, 'yes')}
+              className={`flex items-center px-6 py-3 rounded-lg border-2 transition-colors ${currentValue === 'yes' ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 hover:border-green-500'}`}>
+              Yes
+            </button>
+            <button type="button" onClick={() => handleResponseChange(questionId, 'no')}
+              className={`flex items-center px-6 py-3 rounded-lg border-2 transition-colors ${currentValue === 'no' ? 'border-red-500 bg-red-500 text-white' : 'border-gray-300 hover:border-red-500'}`}>
+              No
+            </button>
+          </div>
+        )
+
       case 'text':
       default:
         return (

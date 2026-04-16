@@ -30,8 +30,8 @@ export default function SettingsPage() {
 
   // Profile form state
   const [profileData, setProfileData] = useState({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
+    firstName: user?.firstName || user?.first_name || '',
+    lastName: user?.lastName || user?.last_name || '',
     email: user?.email || '',
     phone: user?.phone || '',
     organization: user?.organizationName || '',

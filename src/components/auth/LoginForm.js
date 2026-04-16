@@ -183,6 +183,9 @@ export default function LoginForm() {
               {validationErrors.password && (
                 <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>
               )}
+              <p className="mt-1 text-xs text-gray-500">
+                Password must be at least 8 characters and include uppercase, lowercase, number, and special character (@$!%*?&).
+              </p>
             </div>
 
             {/* Forgot Password Link */}

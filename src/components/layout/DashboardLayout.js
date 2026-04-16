@@ -121,7 +121,7 @@ export default function DashboardLayout({ children, title = 'Dashboard' }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">
-                {user?.firstName} {user?.lastName}
+                {user?.firstName || user?.first_name} {user?.lastName || user?.last_name}
               </p>
               <p className="text-xs text-gray-300 truncate">
                 {user?.email}
@@ -176,7 +176,7 @@ export default function DashboardLayout({ children, title = 'Dashboard' }) {
                     <User className="h-4 w-4 text-white" />
                   </div>
                   <span className="text-sm font-medium text-gray-700 hidden md:block">
-                    {user?.firstName}
+                    {user?.firstName || user?.first_name}
                   </span>
                 </div>
               </div>

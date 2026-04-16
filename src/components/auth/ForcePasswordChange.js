@@ -152,7 +152,7 @@ export default function ForcePasswordChange() {
         <div className="text-center">
           <h2 className="text-3xl font-bold text-gray-900">Change Your Password</h2>
           <p className="mt-2 text-gray-600">
-            Welcome, {user?.firstName}! Please change your temporary password to continue.
+            Welcome, {user?.firstName || user?.first_name}! Please change your temporary password to continue.
           </p>
         </div>
 

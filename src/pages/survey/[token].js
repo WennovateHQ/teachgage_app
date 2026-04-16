@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import { surveyAPI } from '../../utils/api'
+import { surveyAPI, questionnaireAPI } from '../../utils/api'
 import { 
   CheckCircle,
   AlertCircle,
@@ -31,10 +31,11 @@ export default function SurveyResponsePage() {
       if (!token) return;
       setIsLoading(true);
       try {
+        // First try to validate as an invitation token
         const response = await surveyAPI.validateInvitation(token);
         const surveyData = response.data?.data?.survey || response.data?.data || response.data;
-        
-        if (surveyData && surveyData.status === 'active') {
+
+        if (surveyData && (surveyData.status === 'active' || surveyData.status === 'published')) {
           setSurvey({
             ...surveyData,
             id: surveyData.id || surveyData._id,
@@ -44,8 +45,36 @@ export default function SurveyResponsePage() {
           setError('Survey not found or no longer active.');
         }
       } catch (err) {
-        console.error('Failed to load survey:', err);
-        setError('Survey not found or no longer active.');
+        console.error('Token validation failed, trying as survey ID:', err);
+        // If token validation fails, try loading directly as a survey ID
+        try {
+          const response = await surveyAPI.getSurvey(token);
+          const surveyData = response.data?.survey || response.data?.data || response.data;
+
+          if (surveyData) {
+            let questions = surveyData.questions || [];
+            // If survey has a linked questionnaire, fetch its questions
+            if (surveyData.questionnaireId && questions.length === 0) {
+              try {
+                const qRes = await questionnaireAPI.getQuestionnaire(surveyData.questionnaireId);
+                const qData = qRes.data?.data || qRes.data;
+                questions = qData?.questions || [];
+              } catch (qErr) {
+                console.error('Failed to load questionnaire:', qErr);
+              }
+            }
+            setSurvey({
+              ...surveyData,
+              id: surveyData.id || surveyData._id,
+              questions,
+            });
+          } else {
+            setError('Survey not found or no longer active.');
+          }
+        } catch (err2) {
+          console.error('Failed to load survey by ID:', err2);
+          setError('Survey not found or no longer active.');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -86,9 +115,15 @@ export default function SurveyResponsePage() {
     }
 
     try {
+      // Format responses as answers array for backend compatibility
+      const answers = Object.entries(responses).map(([questionId, value]) => ({
+        questionId,
+        value
+      })).filter(r => r.value !== null && r.value !== undefined);
+
       await surveyAPI.submitResponse(survey.id, {
         token,
-        responses,
+        answers,
         completedAt: new Date().toISOString(),
       });
       setIsCompleted(true);
@@ -264,8 +299,138 @@ export default function SurveyResponsePage() {
           </div>
         )
 
+      case 'dropdown':
+        return (
+          <div className="max-w-md mx-auto">
+            <select
+              value={responses[question.id] || ''}
+              onChange={(e) => handleResponse(question.id, e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent bg-white"
+            >
+              <option value="">Select an option...</option>
+              {(question.options?.choices || question.options || []).map((choice, index) => (
+                <option key={index} value={typeof choice === 'string' ? choice : choice.value || choice.label}>
+                  {typeof choice === 'string' ? choice : choice.label || choice.value}
+                </option>
+              ))}
+            </select>
+          </div>
+        )
+
+      case 'slider':
+      case 'opinion_scale':
+      case 'nps': {
+        const min = question.options?.min ?? 0
+        const max = question.options?.max ?? 10
+        const currentVal = responses[question.id] ?? Math.floor((min + max) / 2)
+        return (
+          <div className="space-y-4 max-w-lg mx-auto">
+            <input
+              type="range"
+              min={min}
+              max={max}
+              step={question.options?.step || 1}
+              value={currentVal}
+              onChange={(e) => handleResponse(question.id, parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-teachgage-blue"
+            />
+            <div className="flex justify-between text-sm text-teachgage-navy">
+              <span>{question.options?.minLabel || min}</span>
+              <span className="text-lg font-bold text-teachgage-blue">{responses[question.id] ?? '-'}</span>
+              <span>{question.options?.maxLabel || max}</span>
+            </div>
+          </div>
+        )
+      }
+
+      case 'matrix': {
+        const rows = question.options?.rows || question.options?.statements || []
+        const columns = question.options?.columns || question.options?.scale || ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree']
+        return (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-left p-3 border-b border-gray-200"></th>
+                  {columns.map((col, i) => (
+                    <th key={i} className="p-3 text-center text-xs font-medium text-teachgage-navy border-b border-gray-200 min-w-[80px]">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, rowIndex) => (
+                  <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : ''}>
+                    <td className="p-3 text-sm font-medium text-teachgage-navy">{row}</td>
+                    {columns.map((col, colIndex) => (
+                      <td key={colIndex} className="p-3 text-center">
+                        <input
+                          type="radio"
+                          name={`matrix-${question.id}-${rowIndex}`}
+                          checked={(responses[question.id] || {})[rowIndex] === colIndex}
+                          onChange={() => {
+                            const current = responses[question.id] || {}
+                            handleResponse(question.id, { ...current, [rowIndex]: colIndex })
+                          }}
+                          className="w-4 h-4 text-teachgage-blue focus:ring-teachgage-blue cursor-pointer"
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+
+      case 'rank_order': {
+        const items = question.options?.choices || question.options || []
+        const ranked = responses[question.id] || []
+        const unranked = items.filter(item => !ranked.includes(typeof item === 'string' ? item : item.value))
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">Click items in the order you'd like to rank them (first click = rank 1).</p>
+            {ranked.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-teachgage-navy">Your ranking:</p>
+                {ranked.map((item, i) => (
+                  <div key={i} className="flex items-center p-3 bg-teachgage-blue text-white rounded-lg">
+                    <span className="w-6 h-6 flex items-center justify-center bg-white text-teachgage-blue rounded-full text-sm font-bold mr-3">{i + 1}</span>
+                    {item}
+                    <button onClick={() => handleResponse(question.id, ranked.filter((_, idx) => idx !== i))} className="ml-auto text-white/80 hover:text-white text-sm">Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {unranked.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-500">Available items:</p>
+                {unranked.map((item, i) => {
+                  const val = typeof item === 'string' ? item : item.value
+                  return (
+                    <button key={i} onClick={() => handleResponse(question.id, [...ranked, val])} className="w-full text-left p-3 rounded-lg border-2 border-gray-300 hover:border-teachgage-blue transition-colors">
+                      {typeof item === 'string' ? item : item.label || item.value}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      }
+
       default:
-        return <div>Unsupported question type</div>
+        return (
+          <textarea
+            value={responses[question.id] || ''}
+            onChange={(e) => handleResponse(question.id, e.target.value)}
+            placeholder="Type your answer here..."
+            rows={4}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent resize-none"
+          />
+        )
     }
   }
 

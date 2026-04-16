@@ -6,7 +6,7 @@ import PipelineKanban from '../../components/pipeline/PipelineKanban'
 import PipelineAnalytics from '../../components/pipeline/PipelineAnalytics'
 import TriggerConfigPanel from '../../components/pipeline/TriggerConfigPanel'
 import { pipelineAPI } from '../../utils/api'
-import { LayoutGrid, BarChart3, Zap, CheckCircle, X, Info } from 'lucide-react'
+import { LayoutGrid, BarChart3, Zap, CheckCircle, X, Info, Plus, Loader2 } from 'lucide-react'
 
 export default function InstructorPipelinePage() {
   const { user } = useAuth()
@@ -16,6 +16,9 @@ export default function InstructorPipelinePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('kanban')
   const [showDefaultPipelineNotification, setShowDefaultPipelineNotification] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState({ name: '', description: '', type: 'instructor_evaluation' })
+  const [isCreating, setIsCreating] = useState(false)
 
   useEffect(() => {
     loadPipelines()
@@ -65,6 +68,32 @@ export default function InstructorPipelinePage() {
     loadStages()
   }, [selectedPipeline])
 
+  const handleCreatePipeline = async (e) => {
+    e.preventDefault()
+    if (!createForm.name.trim()) return
+    setIsCreating(true)
+    try {
+      const response = await pipelineAPI.createPipeline({
+        name: createForm.name,
+        description: createForm.description,
+        type: createForm.type,
+        stages: [
+          { name: 'Start', description: 'Initial evaluation stage', order: 0, type: 'survey' },
+          { name: 'Mid', description: 'Mid-term evaluation', order: 1, type: 'survey' },
+          { name: 'End', description: 'Final evaluation', order: 2, type: 'review' }
+        ]
+      })
+      setShowCreateModal(false)
+      setCreateForm({ name: '', description: '', type: 'instructor_evaluation' })
+      await loadPipelines()
+    } catch (err) {
+      console.error('Failed to create pipeline:', err)
+      alert('Failed to create pipeline. Please try again.')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
   const tabs = [
     { id: 'kanban', label: 'Board', icon: LayoutGrid },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -103,6 +132,12 @@ export default function InstructorPipelinePage() {
                     </option>
                   ))}
                 </select>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="inline-flex items-center px-4 py-2 bg-teachgage-blue text-white rounded-lg hover:bg-teachgage-dark-blue transition-colors text-sm"
+                >
+                  <Plus className="w-4 h-4 mr-1" /> New Pipeline
+                </button>
               </div>
             </div>
 
@@ -213,6 +248,75 @@ export default function InstructorPipelinePage() {
                   <p className="text-gray-400">Select a pipeline to manage triggers</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Create Pipeline Modal */}
+          {showCreateModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900">Create New Pipeline</h2>
+                  <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <form onSubmit={handleCreatePipeline} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Pipeline Name *</label>
+                    <input
+                      type="text"
+                      value={createForm.name}
+                      onChange={(e) => setCreateForm(p => ({ ...p, name: e.target.value }))}
+                      placeholder="e.g. Spring 2026 Evaluations"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      value={createForm.description}
+                      onChange={(e) => setCreateForm(p => ({ ...p, description: e.target.value }))}
+                      placeholder="Describe the purpose of this pipeline..."
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent resize-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Pipeline Type</label>
+                    <select
+                      value={createForm.type}
+                      onChange={(e) => setCreateForm(p => ({ ...p, type: e.target.value }))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teachgage-blue focus:border-transparent"
+                    >
+                      <option value="instructor_evaluation">Instructor Evaluation</option>
+                      <option value="course_evaluation">Course Evaluation</option>
+                      <option value="professional_development">Professional Development</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    A default 3-stage pipeline (Start → Mid → End) will be created. You can customize stages afterwards.
+                  </p>
+                  <div className="flex justify-end space-x-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateModal(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isCreating}
+                      className="inline-flex items-center px-5 py-2 bg-teachgage-blue text-white rounded-lg hover:bg-teachgage-dark-blue transition-colors disabled:opacity-50"
+                    >
+                      {isCreating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating...</> : 'Create Pipeline'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
         </div>

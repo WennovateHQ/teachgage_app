@@ -339,6 +339,9 @@ export default function SignupForm() {
                 {validationErrors.password && (
                   <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>
                 )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Min 8 chars, with uppercase, lowercase, number & special character (@$!%*?&).
+                </p>
               </div>
 
               {/* Confirm Password */}

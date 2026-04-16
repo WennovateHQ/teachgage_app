@@ -35,9 +35,9 @@ const FAQ_ITEMS = [
 const GUIDES = [
   { title: 'Getting Started Guide', desc: 'Step-by-step walkthrough for new users', icon: BookOpen, href: '/dashboard/guides/getting-started' },
   { title: 'Survey Builder Tutorial', desc: 'Learn to create effective surveys', icon: FileText, href: '/dashboard/guides/survey-builder' },
-  { title: 'Pipeline Management', desc: 'Automate your evaluation workflow', icon: Video, href: '/dashboard/guides/pipeline-management' },
+  { title: 'Pipeline Management', desc: 'Automate your evaluation workflow', icon: LifeBuoy, href: '/dashboard/guides/pipeline-management' },
   { title: 'Analytics & Reporting', desc: 'Understanding your data and exports', icon: FileText, href: '/dashboard/guides/analytics-reporting' },
-  { title: 'AI Insights Guide', desc: 'Using AI-powered growth plans', icon: Video, href: '/dashboard/guides/ai-insights' },
+  { title: 'AI Insights Guide', desc: 'Using AI-powered growth plans', icon: HelpCircle, href: '/dashboard/guides/ai-insights' },
   { title: 'Organization Admin Guide', desc: 'Managing users, departments, and billing', icon: BookOpen, href: '/dashboard/guides/organization-admin' },
 ]
 

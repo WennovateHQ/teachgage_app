@@ -37,7 +37,8 @@ export default function QuestionnairesPage() {
   const loadQuestionnaires = async () => {
     try {
       setLoading(true)
-      const response = await questionnaireAPI.getQuestionnaires()
+      const userId = user?.user_id || user?.id || user?.userId
+      const response = await questionnaireAPI.getQuestionnaires({ createdBy: userId })
       console.log('Questionnaires API response:', response.data)
       
       // Handle various response formats

@@ -138,14 +138,8 @@ export default function VerifyEmailPage() {
                   </ul>
                 </div>
 
-                <Link href="/dashboard">
-                  <button className="w-full flex justify-center py-3 px-4 bg-teachgage-blue text-white rounded-md hover:bg-teachgage-medium-blue transition-colors">
-                    Go to Dashboard
-                  </button>
-                </Link>
-
                 <Link href="/auth/signin">
-                  <button className="w-full flex justify-center items-center py-2 px-4 border border-teachgage-blue text-teachgage-blue rounded-md hover:bg-teachgage-blue hover:text-white transition-colors">
+                  <button className="w-full flex justify-center py-3 px-4 bg-teachgage-blue text-white rounded-md hover:bg-teachgage-medium-blue transition-colors">
                     Sign In
                   </button>
                 </Link>

@@ -185,7 +185,7 @@ export default function InstructorDashboard({ onCreateCourse, onCreateSurvey }) 
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">
-              Welcome back, {user?.firstName}!
+              Welcome back, {user?.firstName || user?.first_name || 'Instructor'}!
             </h1>
             <p className="text-teachgage-cream mt-1">
               {user?.role === 'instructor' && user?.organizationId 

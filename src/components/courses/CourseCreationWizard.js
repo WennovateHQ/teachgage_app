@@ -187,18 +187,18 @@ export default function CourseCreationWizard({ onClose }) {
       // Clean up form data
       const courseData = {
         name: formData.title,
-        code: formData.code,
+        course_code: formData.code,
         description: formData.description,
         objectives: formData.objectives.filter(obj => obj.trim()),
         prerequisites: formData.prerequisites.filter(req => req.trim()),
         category: formData.category || null,
         tags: formData.tags || [],
-        instructorId: user.id || user.userId,
-        organizationId: user.organizationId || null,
-        departmentId: user.departmentId || null,
-        startDate: formData.startDate || null,
-        endDate: formData.endDate || null,
-        capacity: formData.maxStudents,
+        instructor_id: user.user_id || user.id || user.userId,
+        organization_id: user.organization_id || user.organizationId || null,
+        department_id: user.department_id || user.departmentId || null,
+        start_date: formData.startDate || null,
+        end_date: formData.endDate || null,
+        max_students: formData.maxStudents,
         status: formData.status || 'draft',
         allowSelfAllocation: formData.allowSelfEnrollment
       };
